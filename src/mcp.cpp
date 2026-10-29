@@ -85,8 +85,7 @@ void StartMcpPipe(HWND window) {
                         try {
                             McpCall call{Json::parse(s),{}};
                             // UI owns the buffers; the pipe thread never touches controls.
-                            DWORD_PTR ignored=0;
-                            if(SendMessageTimeoutW(window,WM_MCP_CALL,0,(LPARAM)&call,SMTO_BLOCK,10000,&ignored)) {
+                            if(SendMessageW(window,WM_MCP_CALL,0,(LPARAM)&call)) {
                                 auto reply=call.result.dump(); size=(DWORD)reply.size();
                                 if(size<=MAX_RPC_BYTES) { WriteExact(pipe,&size,4); WriteExact(pipe,reply.data(),size); }
                             }

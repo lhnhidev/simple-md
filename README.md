@@ -2,7 +2,7 @@
 
 An ultra-lightweight native Windows Markdown editor built with C++. Read, edit, and save multiple files with a minimal UI and optional MCP integration for Claude and Codex.
 
-> **Status: work in progress.** This first commit contains the project foundation, Markdown renderer, and MCP bridge. The native editor UI and runnable executable are still being implemented. Features below describe the intended first release, not a finished product.
+> **Status: working first build, validation in progress.** The native editor builds and runs. Document handling and the MCP protocol pass automated tests. Final memory measurements and end-to-end MCP bridge validation are next.
 
 ## Goals
 
@@ -13,7 +13,9 @@ An ultra-lightweight native Windows Markdown editor built with C++. Read, edit, 
 - Load document contents on demand and render previews only when needed.
 - Offer optional local MCP integration so Claude or Codex can work with open documents.
 
-Memory usage depends on file sizes, the number of loaded documents, and the active view. There is no fixed 1 MB RAM promise. Executable size and actual memory measurements will be published after the first working build.
+Memory usage depends on file sizes, the number of loaded documents, and the active view. There is no fixed 1 MB RAM promise. The current release executable is **487,424 bytes (476 KiB)**. A first empty-window measurement was about **18 MiB working set / 2.8 MiB private memory**; further measurements are in progress.
+
+Clean inactive editor buffers are evicted to keep at most three loaded clean documents. Unsaved documents stay in memory. Preview is released in Edit mode and pauses above 400,000 characters. The editor accepts files up to 16 MiB. Folder browsing lists up to 2,000 Markdown files in the selected folder and loads contents on selection.
 
 ## MCP design
 
@@ -24,7 +26,30 @@ Memory usage depends on file sizes, the number of loaded documents, and the acti
 - The executable runs as an MCP stdio server with `--mcp` and connects to the running editor through a local named pipe restricted to the current Windows user.
 - Tools: `list_documents`, `read_document`, and `update_document`.
 
-Client setup instructions will be added with the first working build. No Claude or Codex configuration is changed automatically.
+Use **MCP: Off → Copy connection setup** to copy client snippets with the executable's actual path. Merge the relevant section into your client configuration, then choose **Read** or **Edit** in simple-md. MCP returns to Off at every launch. No Claude or Codex configuration is changed automatically.
+
+For Codex, add to `%USERPROFILE%\.codex\config.toml`:
+
+```toml
+[mcp_servers.simple-md]
+command = 'D:\workspace\simple-md\dist\simple-md.exe'
+args = ["--mcp"]
+```
+
+For Claude Desktop, merge into `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "simple-md": {
+      "command": "D:\\workspace\\simple-md\\dist\\simple-md.exe",
+      "args": ["--mcp"]
+    }
+  }
+}
+```
+
+Adjust the path if you move the executable. The app implements the initialize-based MCP revisions through `2025-11-25` over stdio.
 
 ## Technology
 
@@ -44,7 +69,7 @@ Third-party licenses are included in `vendor/`.
 ```text
 src/          Native application, Markdown renderer, and MCP bridge
 vendor/       Pinned third-party source code and licenses
-tests/        Functional verification (being implemented)
+tests/        Native document/editor checks and MCP stdio tests
 build.ps1     MSVC release build script
 PROGRESS.md   Development checklist
 ```
@@ -53,13 +78,32 @@ PROGRESS.md   Development checklist
 
 Requires Windows 10/11 x64 and Visual Studio / Build Tools with **Desktop development with C++** and a Windows SDK.
 
-The build script is included, but it will become runnable once the remaining application entry point and UI are committed:
-
 ```powershell
-.\build.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build.ps1
+.\dist\simple-md.exe
 ```
 
-The release executable will be generated at `dist\simple-md.exe`. Build outputs are excluded from Git.
+Run automated checks (Node.js is needed for the MCP protocol test):
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\test.ps1
+```
+
+The release executable is generated at `dist\simple-md.exe`. It uses system Windows components and requires no .NET, Node.js, or browser runtime to run. Build outputs are excluded from Git.
+
+## Keyboard shortcuts
+
+| Action | Shortcut |
+| --- | --- |
+| New / open | Ctrl+N / Ctrl+O |
+| Save / save as | Ctrl+S / Ctrl+Shift+S |
+| Close document | Ctrl+W |
+| Next / previous document | Ctrl+Tab / Ctrl+Shift+Tab |
+| Read / Edit / Split | Ctrl+1 / Ctrl+2 / Ctrl+3 |
+| Find / next match | Ctrl+F / F3 |
+| Bold / italic Markdown | Ctrl+B / Ctrl+I |
+
+The read view supports headings, emphasis, lists, task lists, quotes, code, and text tables. Images appear as labels and are not downloaded. Raw HTML remains text. The current preview does not load remote content or open links.
 
 ## Development
 
