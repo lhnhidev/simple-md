@@ -15,7 +15,7 @@ Project: `D:\workspace\simple-md`
 - [x] Viết hướng dẫn build/chạy/kết nối MCP trong README.
 - [x] Kiểm tra named pipe: list/read/edit, Read chặn sửa, Off đóng listener, khởi động lại và ngắt client treo.
 - [x] Đo và ghi nhận RAM cho 5 trường hợp sử dụng; có script tái chạy và JSON kết quả.
-- [ ] Đóng gói bản portable kèm license thư viện.
+- [x] Tạo script đóng gói portable kèm hướng dẫn tiếng Việt, số liệu benchmark, license thư viện và checksum SHA-256.
 
 ## Số đo sơ bộ (máy phát triển, 2026-10-29)
 

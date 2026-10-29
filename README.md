@@ -2,6 +2,8 @@
 
 An ultra-lightweight native Windows Markdown editor built with C++. Read, edit, and save multiple files with a minimal UI and optional MCP integration for Claude and Codex.
 
+Vietnamese usage guide: [HUONG_DAN.md](HUONG_DAN.md).
+
 > **Status: working first build.** 84 native checks cover document handling, editor behavior, cache eviction, and the local MCP bridge, including a real stdio client connected to the editor. MCP stdio tests also pass. Memory benchmarks are recorded below.
 
 ## Goals
@@ -115,6 +117,14 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\measure-memory.p
 
 The release executable is generated at `dist\simple-md.exe`. It uses system Windows components and requires no .NET, Node.js, or browser runtime to run. Build outputs are excluded from Git.
 
+Create a portable ZIP with usage guides, benchmark results, and third-party licenses:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\package.ps1
+```
+
+Output: `dist\simple-md-1.0.0-win-x64.zip` and its SHA-256 checksum. The ZIP is generated locally and is not automatically published as a GitHub Release.
+
 ## Keyboard shortcuts
 
 | Action | Shortcut |
@@ -128,6 +138,8 @@ The release executable is generated at `dist\simple-md.exe`. It uses system Wind
 | Bold / italic Markdown | Ctrl+B / Ctrl+I |
 
 The read view supports headings, emphasis, lists, task lists, quotes, code, and text tables. Images appear as labels and are not downloaded. Raw HTML remains text. The current preview does not load remote content or open links.
+
+There is no crash recovery for unsaved buffers in this version; save regularly. UTF-8, UTF-8 BOM, UTF-16 LE/BE, and LF/CRLF are supported. Other encodings need conversion before opening. Inactive clean documents can be reloaded from disk after eviction, so their prior undo history is not retained indefinitely.
 
 ## Development
 
