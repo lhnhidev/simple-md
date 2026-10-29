@@ -9,7 +9,7 @@ Project: `D:\workspace\simple-md`
 - [x] Hoàn thiện giao diện mở nhiều tài liệu, đọc/sửa/song song, tìm kiếm.
 - [x] Hoàn thiện lưu an toàn, kiểm tra xung đột khi file thay đổi bên ngoài.
 - [x] Biên dịch bản chạy: 488.448 bytes (477 KiB).
-- [x] Kiểm tra 84 điều kiện về Unicode, encoding, lưu/đọc, undo, quyền MCP, revision, cache và named pipe.
+- [x] Kiểm tra 88 điều kiện về Unicode, encoding, lưu/đọc, undo, quyền MCP, revision, cache, named pipe và vẽ nhãn giao diện.
 - [x] Kiểm tra MCP stdio: handshake, notifications, tool discovery, ping, lỗi, mặc định tắt.
 - [x] Kiểm tra giao diện trống qua Computer Use; đã dừng theo trao đổi với người dùng.
 - [x] Viết hướng dẫn build/chạy/kết nối MCP trong README.
@@ -91,6 +91,14 @@ Commit và push lên `main` sau mỗi phần đã hoàn thành và kiểm tra đ
 - Chỉ gọi xử lý accelerator cho thông điệp phím, không cho mọi thông điệp cửa sổ.
 - 84 kiểm tra vẫn đạt sau thay đổi. Working set bài đo đầu của lượt này: 10,13 MiB; chưa đạt mục tiêu 7 MB.
 - Đang đo tách phần khởi tạo cửa sổ, font, button, danh sách và vòng lặp phím trong chương trình đối chứng để xác định các DLL còn nạp sớm.
+
+## Giảm chi phí vẽ chữ giao diện
+
+- Chữ ASCII trên giao diện dùng GDI trực tiếp; nhãn Unicode giữ đường xử lý đầy đủ của Windows.
+- Kiểm tra vẽ chữ ASCII, tiếng Việt/emoji và cắt trong khung bằng bitmap riêng, không chụp desktop.
+- Tổng 88 kiểm tra đạt. Working set cửa sổ trống hiển thị giảm tiếp còn khoảng 9,37 MiB; chưa đạt 7 MB.
+- Thử x86 không tốt hơn bản x64 trên máy này, nên vẫn giữ bản phát hành x64.
+- Đính chính phương pháp: PowerShell không truyền cờ Hidden như dự kiến (STARTUPINFO flags = 0), nên các số đo trước của ứng dụng đầy đủ thực tế là cửa sổ hiển thị. Sẽ cập nhật mô tả bài đo; không dùng số đo cửa sổ ẩn để tuyên bố đạt mục tiêu cửa sổ hiển thị.
 
 MCP mặc định tắt. Khi được bật, chỉ tài liệu đang mở được chia sẻ.
 MCP Edit tạo thay đổi chưa lưu để người dùng kiểm tra trước khi Ctrl+S.

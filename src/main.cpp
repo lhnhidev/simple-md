@@ -44,7 +44,24 @@ std::wstring PlainText(HWND window) { int n=GetWindowTextLengthW(window); std::w
 void SetRichText(HWND window,const std::wstring& text) { SETTEXTEX set{ST_DEFAULT,1200};SendMessageW(window,EM_SETTEXTEX,(WPARAM)&set,(LPARAM)text.c_str()); }
 void Fill(HDC dc,RECT rect,COLORREF color) { HBRUSH b=CreateSolidBrush(color);FillRect(dc,&rect,b);DeleteObject(b); }
 void Label(HDC dc,HFONT font,std::wstring text,RECT rect,COLORREF color,UINT flags=DT_LEFT|DT_VCENTER|DT_SINGLELINE|DT_END_ELLIPSIS) {
-    auto old=SelectObject(dc,font);SetBkMode(dc,TRANSPARENT);SetTextColor(dc,color);DrawTextW(dc,text.c_str(),(int)text.size(),&rect,flags);SelectObject(dc,old);
+    auto old=SelectObject(dc,font);SetBkMode(dc,TRANSPARENT);SetTextColor(dc,color);
+    // Plain ASCII chrome does not need complex-script shaping. Unicode file names
+    // and localized text retain the full Windows text layout path.
+    bool ascii=std::all_of(text.begin(),text.end(),[](wchar_t c){return c>=32&&c<127;});
+    SIZE size{};int width=std::max(0L,rect.right-rect.left);
+    if(ascii&&GetTextExtentPoint32W(dc,text.c_str(),(int)text.size(),&size)){
+        if((flags&DT_END_ELLIPSIS)&&size.cx>width){
+            std::wstring original=std::move(text);size_t low=0,high=original.size();
+            while(low<high){size_t middle=(low+high+1)/2;auto trial=original.substr(0,middle)+L"...";SIZE trialSize{};GetTextExtentPoint32W(dc,trial.c_str(),(int)trial.size(),&trialSize);if(trialSize.cx<=width)low=middle;else high=middle-1;}
+            text=original.substr(0,low)+L"...";GetTextExtentPoint32W(dc,text.c_str(),(int)text.size(),&size);
+        }
+        int x=rect.left,y=rect.top;
+        if(flags&DT_CENTER)x+=(width-size.cx)/2;else if(flags&DT_RIGHT)x=rect.right-size.cx;
+        if(flags&DT_VCENTER)y+=(rect.bottom-rect.top-size.cy)/2;else if(flags&DT_BOTTOM)y=rect.bottom-size.cy;
+        UINT align=SetTextAlign(dc,TA_LEFT|TA_TOP|TA_NOUPDATECP);
+        ExtTextOutW(dc,x,y,ETO_CLIPPED|ETO_IGNORELANGUAGE,&rect,text.c_str(),(UINT)text.size(),nullptr);SetTextAlign(dc,align);
+    }else DrawTextW(dc,text.c_str(),(int)text.size(),&rect,flags);
+    SelectObject(dc,old);
 }
 class Application {
 public:

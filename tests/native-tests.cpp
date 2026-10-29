@@ -42,6 +42,12 @@ int main(){
         HWND window=CreateWindowExW(0,wc.lpszClassName,L"simple-md tests",WS_OVERLAPPEDWINDOW,0,0,1000,700,nullptr,nullptr,wc.hInstance,&app);
         Check(window!=nullptr,"Test window creation failed");
         Check(app.list==nullptr&&app.richModule==nullptr&&app.preview==nullptr&&app.findInput==nullptr&&!app.renderer.joinable(),"Empty window eagerly initialized document components");
+        // Render labels to an isolated bitmap: no desktop capture or input automation.
+        HDC labelDc=CreateCompatibleDC(nullptr);BITMAPINFO bitmap{};bitmap.bmiHeader.biSize=sizeof(BITMAPINFOHEADER);bitmap.bmiHeader.biWidth=160;bitmap.bmiHeader.biHeight=-104;bitmap.bmiHeader.biPlanes=1;bitmap.bmiHeader.biBitCount=32;bitmap.bmiHeader.biCompression=BI_RGB;void* pixels=nullptr;
+        HBITMAP labelBitmap=CreateDIBSection(labelDc,&bitmap,DIB_RGB_COLORS,&pixels,nullptr,0);Check(labelBitmap&&pixels,"Cannot create label rendering surface");auto oldBitmap=SelectObject(labelDc,labelBitmap);
+        Fill(labelDc,{0,0,160,104},PAPER);Label(labelDc,app.ui,L"simple-md / a deliberately long label",{12,8,148,44},INK);Label(labelDc,app.ui,L"Tiếng Việt 🦀",{12,55,148,94},INK);GdiFlush();
+        int asciiInk=0,unicodeInk=0;bool clipped=true;for(int y=0;y<104;++y)for(int x=0;x<160;++x)if((((uint32_t*)pixels)[y*160+x]&0xffffff)!=0xffffff){if(x<12||x>=148||y<8||y>=94||(y>=44&&y<55))clipped=false;if(y<44)++asciiInk;else++unicodeInk;}
+        Check(asciiInk>5,"ASCII labels did not render");Check(unicodeInk>5,"Unicode labels did not render");Check(clipped,"Label rendering escaped its clipping rectangle");SelectObject(labelDc,oldBitmap);DeleteObject(labelBitmap);DeleteDC(labelDc);
         app.Open(files[0]);Check(app.Current()!=nullptr,"Document did not open");Check(ControlText(app.Current()->editor)==source+L"updated\n","Editor changed source text");
         auto* d=app.Current();auto id=std::to_string(d->id);
         Check(app.Mcp({{"name","list_documents"}})["isError"].get<bool>(),"MCP default should be off");
