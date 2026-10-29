@@ -14,13 +14,21 @@ Project: `D:\workspace\simple-md`
 - [x] Kiểm tra giao diện trống qua Computer Use; đã dừng theo trao đổi với người dùng.
 - [x] Viết hướng dẫn build/chạy/kết nối MCP trong README.
 - [x] Kiểm tra named pipe: list/read/edit, Read chặn sửa, Off đóng listener, khởi động lại và ngắt client treo.
-- [ ] Đo và ghi nhận RAM cho nhiều trường hợp sử dụng.
+- [x] Đo và ghi nhận RAM cho 5 trường hợp sử dụng; có script tái chạy và JSON kết quả.
 - [ ] Đóng gói bản portable kèm license thư viện.
 
 ## Số đo sơ bộ (máy phát triển, 2026-10-29)
 
 - Cửa sổ trống: khoảng 18 MiB working set, 2,8 MiB private memory.
 - File mẫu 1.500.000 bytes: mở trong 284 ms trong bài kiểm thử native.
+- Benchmark tự động, mỗi trường hợp dùng một tiến trình ẩn mới:
+  - Trống: 15,07 MiB working set / 2,39 MiB private committed.
+  - Một file nhỏ: 17,55 / 2,74 MiB.
+  - Danh sách 30 file, nạp file đầu: 17,58 / 2,77 MiB.
+  - Xem trước file 178 KB: 19,15 / 4,29 MiB.
+  - File 1,78 MB, dừng preview: 25,06 / 10,55 MiB.
+- CPU khi rảnh: ghi nhận 0 ms trong mẫu 1 giây ở cả 5 trường hợp.
+- Số liệu đầy đủ: `benchmarks/memory-baseline.json`; cách đo: `tests/measure-memory.ps1`.
 - Đây là số đo cho các tình huống cụ thể, không phải giới hạn RAM hay độ trễ cố định.
 
 ## Cập nhật MCP

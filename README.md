@@ -2,7 +2,7 @@
 
 An ultra-lightweight native Windows Markdown editor built with C++. Read, edit, and save multiple files with a minimal UI and optional MCP integration for Claude and Codex.
 
-> **Status: working first build, validation in progress.** The native editor builds and runs. Document handling, MCP stdio, and the local MCP bridge pass automated tests. Final memory measurements and portable packaging are next.
+> **Status: working first build.** Document handling, MCP stdio, and the local MCP bridge pass automated tests. Memory benchmarks are recorded below. Portable packaging is in progress.
 
 ## Goals
 
@@ -13,7 +13,19 @@ An ultra-lightweight native Windows Markdown editor built with C++. Read, edit, 
 - Load document contents on demand and render previews only when needed.
 - Offer optional local MCP integration so Claude or Codex can work with open documents.
 
-Memory usage depends on file sizes, the number of loaded documents, and the active view. There is no fixed 1 MB RAM promise. The current release executable is **488,448 bytes (477 KiB)**. A first empty-window measurement was about **18 MiB working set / 2.8 MiB private memory**; further measurements are in progress.
+Memory usage depends on file sizes, the number of loaded documents, and the active view. There is no fixed 1 MB RAM promise. The current release executable is **488,448 bytes (477 KiB)**.
+
+Measured on the development machine (Windows 11 x64, 2026-10-29), using a fresh hidden process and synthetic files for each scenario:
+
+| Scenario | Working set | Private committed memory |
+| --- | ---: | ---: |
+| Empty window | 15.07 MiB | 2.39 MiB |
+| One 2.67 KB file | 17.55 MiB | 2.74 MiB |
+| 30 listed small files, first loaded | 17.58 MiB | 2.77 MiB |
+| 178 KB file with preview | 19.15 MiB | 4.29 MiB |
+| 1.78 MB file, preview paused | 25.06 MiB | 10.55 MiB |
+
+Working set includes resident shared Windows DLL pages; private committed memory is a different metric and is not a substitute for total RAM usage. Every scenario recorded 0 ms CPU time during a one-second idle sample. A visible empty-window spot check was around 18 MiB working set. Results vary with Windows, display state, files, and usage; these are observations, not guaranteed limits. No artificial working-set trimming is used. See [raw results and methodology](benchmarks/memory-baseline.json).
 
 Clean inactive editor buffers are evicted to keep at most three loaded clean documents. Unsaved documents stay in memory. Preview is released in Edit mode and pauses above 400,000 characters. The editor accepts files up to 16 MiB. Folder browsing lists up to 2,000 Markdown files in the selected folder and loads contents on selection.
 
@@ -87,6 +99,12 @@ Run automated checks (Node.js is needed for the MCP protocol test):
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\test.ps1
+```
+
+Reproduce the memory benchmark with the editor closed:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\measure-memory.ps1
 ```
 
 The release executable is generated at `dist\simple-md.exe`. It uses system Windows components and requires no .NET, Node.js, or browser runtime to run. Build outputs are excluded from Git.
