@@ -27,6 +27,10 @@ std::wstring PipeName() { return L"\\\\.\\pipe\\simple-md-"+UserSid(); }
 namespace {
 std::thread pipeThread;
 std::atomic<bool> stopping{true};
+HANDLE CreateLocalPipe(const std::wstring& name,SECURITY_ATTRIBUTES* attributes) {
+    return CreateNamedPipeW(name.c_str(),PIPE_ACCESS_DUPLEX|FILE_FLAG_FIRST_PIPE_INSTANCE,
+        PIPE_TYPE_BYTE|PIPE_READMODE_BYTE|PIPE_WAIT|PIPE_REJECT_REMOTE_CLIENTS,1,65536,65536,1500,attributes);
+}
 bool ReadExact(HANDLE h,void* data,DWORD size) {
     auto* p=(BYTE*)data;
     while(size) { DWORD n=0; if(!ReadFile(h,p,size,&n,nullptr)||!n)return false; size-=n;p+=n; } return true;
@@ -66,15 +70,17 @@ Json ToolDefinitions() {
 }
 void StartMcpPipe(HWND window) {
     if(pipeThread.joinable())return;
+    PSECURITY_DESCRIPTOR sd=nullptr;
+    auto acl=L"D:P(A;;GA;;;"+UserSid()+L")";
+    if(!ConvertStringSecurityDescriptorToSecurityDescriptorW(acl.c_str(),SDDL_REVISION_1,&sd,nullptr))throw std::runtime_error("Cannot create MCP user permissions.");
+    SECURITY_ATTRIBUTES sa{sizeof(sa),sd,FALSE};auto name=PipeName();
+    HANDLE first=CreateLocalPipe(name,&sa);
+    if(first==INVALID_HANDLE_VALUE){LocalFree(sd);throw std::runtime_error("Cannot enable MCP. Another instance may already own the local connection.");}
+    LocalFree(sd);
     stopping=false;
-    pipeThread=std::thread([window] {
-        PSECURITY_DESCRIPTOR sd=nullptr;
-        auto acl=L"D:P(A;;GA;;;"+UserSid()+L")";
-        if(!ConvertStringSecurityDescriptorToSecurityDescriptorW(acl.c_str(),SDDL_REVISION_1,&sd,nullptr))return;
-        SECURITY_ATTRIBUTES sa{sizeof(sa),sd,FALSE}; auto name=PipeName();
+    try {pipeThread=std::thread([window,first] {
+        HANDLE pipe=first;
         while(!stopping) {
-            HANDLE pipe=CreateNamedPipeW(name.c_str(),PIPE_ACCESS_DUPLEX|FILE_FLAG_FIRST_PIPE_INSTANCE,
-                PIPE_TYPE_BYTE|PIPE_READMODE_BYTE|PIPE_WAIT|PIPE_REJECT_REMOTE_CLIENTS,1,65536,65536,1500,&sa);
             if(pipe==INVALID_HANDLE_VALUE)break;
             bool connected=ConnectNamedPipe(pipe,nullptr)!=FALSE || GetLastError()==ERROR_PIPE_CONNECTED;
             if(connected && !stopping) {
@@ -87,16 +93,18 @@ void StartMcpPipe(HWND window) {
                             // UI owns the buffers; the pipe thread never touches controls.
                             if(SendMessageW(window,WM_MCP_CALL,0,(LPARAM)&call)) {
                                 auto reply=call.result.dump(); size=(DWORD)reply.size();
-                                if(size<=MAX_RPC_BYTES) { WriteExact(pipe,&size,4); WriteExact(pipe,reply.data(),size); }
+                                if(size<=MAX_RPC_BYTES && WriteExact(pipe,&size,4) && WriteExact(pipe,reply.data(),size))FlushFileBuffers(pipe);
                             }
                         }catch(...) {}
                     }
                 }
             }
-            DisconnectNamedPipe(pipe); CloseHandle(pipe);
+            DisconnectNamedPipe(pipe);
+            if(stopping){CloseHandle(pipe);pipe=INVALID_HANDLE_VALUE;break;}
+            // Reuse the same server instance so there is no pipe-name ownership gap.
         }
-        LocalFree(sd);
-    });
+        if(pipe!=INVALID_HANDLE_VALUE)CloseHandle(pipe);
+    });}catch(...){CloseHandle(first);stopping=true;throw;}
 }
 void StopMcpPipe() {
     stopping=true;

@@ -65,7 +65,7 @@ public:
     uint64_t generation=0,pendingGeneration=0;
     bool renderStop=false,renderPending=false;
 
-    ~Application() { StopWorker(); DeleteObject(white);DeleteFonts(); }
+    ~Application() { closing=true;mcp=0;StopMcpPipe();StopWorker();DeleteObject(white);DeleteFonts(); }
     int P(int value)const{return MulDiv(value,dpi,96);}
     Document* Current(){return selected>=0&&selected<(int)documents.size()?documents[selected].get():nullptr;}
     void DeleteFonts(){for(auto f:{ui,bold,smallFont,heading,mono})if(f)DeleteObject(f);ui=bold=smallFont=heading=mono=nullptr;}
@@ -247,8 +247,9 @@ public:
         std::wstring replacement=marker+text+marker;SendMessageW(d->editor,EM_REPLACESEL,TRUE,(LPARAM)replacement.c_str());SetFocus(d->editor);
     }
     void McpMode(int next) {
+        if(next)StartMcpPipe(window);
         mcp=next;
-        if(mcp)StartMcpPipe(window);else StopMcpPipe();
+        if(!mcp)StopMcpPipe();
         SetWindowTextW(GetDlgItem(window,ID_MCP),mcp==0?L"MCP: Off":mcp==1?L"MCP: Read":L"MCP: Edit");
         notice=mcp==0?L"MCP disconnected":mcp==1?L"MCP can read open documents":L"MCP edits stay unsaved for your review";InvalidateRect(window,nullptr,FALSE);
     }

@@ -8,12 +8,12 @@ Project: `D:\workspace\simple-md`
 - [x] Viết MCP stdio và cầu nối local, phân quyền Read/Edit.
 - [x] Hoàn thiện giao diện mở nhiều tài liệu, đọc/sửa/song song, tìm kiếm.
 - [x] Hoàn thiện lưu an toàn, kiểm tra xung đột khi file thay đổi bên ngoài.
-- [x] Biên dịch bản chạy: 487.424 bytes (476 KiB).
-- [x] Kiểm tra 69 điều kiện về Unicode, encoding, lưu/đọc, undo, quyền MCP, revision, cache.
+- [x] Biên dịch bản chạy: 488.448 bytes (477 KiB).
+- [x] Kiểm tra 75 điều kiện về Unicode, encoding, lưu/đọc, undo, quyền MCP, revision, cache và named pipe.
 - [x] Kiểm tra MCP stdio: handshake, notifications, tool discovery, ping, lỗi, mặc định tắt.
 - [x] Kiểm tra giao diện trống qua Computer Use; đã dừng theo trao đổi với người dùng.
 - [x] Viết hướng dẫn build/chạy/kết nối MCP trong README.
-- [ ] Kiểm tra toàn tuyến MCP qua named pipe.
+- [x] Kiểm tra named pipe: list/read/edit, Read chặn sửa, Off đóng listener, khởi động lại và ngắt client treo.
 - [ ] Đo và ghi nhận RAM cho nhiều trường hợp sử dụng.
 - [ ] Đóng gói bản portable kèm license thư viện.
 
@@ -22,6 +22,13 @@ Project: `D:\workspace\simple-md`
 - Cửa sổ trống: khoảng 18 MiB working set, 2,8 MiB private memory.
 - File mẫu 1.500.000 bytes: mở trong 284 ms trong bài kiểm thử native.
 - Đây là số đo cho các tình huống cụ thể, không phải giới hạn RAM hay độ trễ cố định.
+
+## Cập nhật MCP
+
+- Giữ một pipe instance suốt phiên bật MCP để không có khoảng trống giành tên pipe.
+- Đảm bảo client nhận hết phản hồi trước khi disconnect.
+- Hủy được kết nối client không gửi dữ liệu khi chuyển Off.
+- Báo lỗi bật kết nối nếu không tạo được listener.
 
 ## Cách cập nhật
 

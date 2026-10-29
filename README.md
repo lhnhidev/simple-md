@@ -2,7 +2,7 @@
 
 An ultra-lightweight native Windows Markdown editor built with C++. Read, edit, and save multiple files with a minimal UI and optional MCP integration for Claude and Codex.
 
-> **Status: working first build, validation in progress.** The native editor builds and runs. Document handling and the MCP protocol pass automated tests. Final memory measurements and end-to-end MCP bridge validation are next.
+> **Status: working first build, validation in progress.** The native editor builds and runs. Document handling, MCP stdio, and the local MCP bridge pass automated tests. Final memory measurements and portable packaging are next.
 
 ## Goals
 
@@ -13,7 +13,7 @@ An ultra-lightweight native Windows Markdown editor built with C++. Read, edit, 
 - Load document contents on demand and render previews only when needed.
 - Offer optional local MCP integration so Claude or Codex can work with open documents.
 
-Memory usage depends on file sizes, the number of loaded documents, and the active view. There is no fixed 1 MB RAM promise. The current release executable is **487,424 bytes (476 KiB)**. A first empty-window measurement was about **18 MiB working set / 2.8 MiB private memory**; further measurements are in progress.
+Memory usage depends on file sizes, the number of loaded documents, and the active view. There is no fixed 1 MB RAM promise. The current release executable is **488,448 bytes (477 KiB)**. A first empty-window measurement was about **18 MiB working set / 2.8 MiB private memory**; further measurements are in progress.
 
 Clean inactive editor buffers are evicted to keep at most three loaded clean documents. Unsaved documents stay in memory. Preview is released in Edit mode and pauses above 400,000 characters. The editor accepts files up to 16 MiB. Folder browsing lists up to 2,000 Markdown files in the selected folder and loads contents on selection.
 

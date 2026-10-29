@@ -7,6 +7,19 @@ int checks=0;
 void Check(bool value,const char* message){if(!value)throw std::runtime_error(message);++checks;}
 void Pump(){MSG msg;while(PeekMessageW(&msg,nullptr,0,0,PM_REMOVE)){TranslateMessage(&msg);DispatchMessageW(&msg);}}
 Json Payload(const Json& result){return Json::parse(result.at("content").at(0).at("text").get<std::string>());}
+Json PipeCall(Application& app,const Json& request){
+    Json result;std::exception_ptr failure;std::atomic<bool> finished{false};
+    std::thread client([&]{try{
+        auto name=PipeName();HANDLE pipe=CreateFileW(name.c_str(),GENERIC_READ|GENERIC_WRITE,0,nullptr,OPEN_EXISTING,0,nullptr);
+        if(pipe==INVALID_HANDLE_VALUE&&GetLastError()==ERROR_PIPE_BUSY){WaitNamedPipeW(name.c_str(),1000);pipe=CreateFileW(name.c_str(),GENERIC_READ|GENERIC_WRITE,0,nullptr,OPEN_EXISTING,0,nullptr);}
+        if(pipe==INVALID_HANDLE_VALUE)throw std::runtime_error("Integration test could not connect to MCP pipe");
+        auto send=request.dump();DWORD size=(DWORD)send.size(),n=0;bool ok=WriteFile(pipe,&size,4,&n,nullptr)&&n==4&&WriteFile(pipe,send.data(),size,&n,nullptr)&&n==size;
+        ok=ok&&ReadFile(pipe,&size,4,&n,nullptr)&&n==4&&size<=MAX_RPC_BYTES;
+        std::string reply;if(ok){reply.resize(size);DWORD used=0;while(used<size){if(!ReadFile(pipe,reply.data()+used,size-used,&n,nullptr)||!n){ok=false;break;}used+=n;}}
+        CloseHandle(pipe);if(!ok)throw std::runtime_error("Integration test pipe transfer failed");result=Json::parse(reply);
+    }catch(...){failure=std::current_exception();}finished=true;});
+    while(!finished){Pump();Sleep(1);}client.join();if(failure)std::rethrow_exception(failure);return result;
+}
 }
 int main(){
     CoInitializeEx(nullptr,COINIT_APARTMENTTHREADED);
@@ -53,6 +66,21 @@ int main(){
         auto emoji=Payload(app.Mcp({{"name","read_document"},{"arguments",{{"id",id},{"offset",1},{"limit",1}}}}));
         Check(emoji["content"].get<std::string>()==Utf8(L"🦀"),"Pagination split a surrogate pair");
         app.Save(*d);
+        app.McpMode(1);
+        auto pipeList=PipeCall(app,{{"name","list_documents"},{"arguments",Json::object()}});
+        Check(!pipeList["isError"].get<bool>()&&Payload(pipeList).size()==1,"Named pipe listing failed");
+        auto pipeRead=PipeCall(app,{{"name","read_document"},{"arguments",{{"id",id}}}});
+        Check(Payload(pipeRead)["content"].get<std::string>()=="a🦀b","Named pipe read corrupted Unicode");
+        Json pipeUpdate={{"name","update_document"},{"arguments",{{"id",id},{"revision",d->revision},{"content","pipe edit"}}}};
+        Check(PipeCall(app,pipeUpdate)["isError"].get<bool>(),"Named pipe ignored Read permission");
+        app.McpMode(2);
+        Check(!PipeCall(app,pipeUpdate)["isError"].get<bool>()&&ControlText(d->editor)==L"pipe edit","Named pipe edit failed");
+        app.Save(*d);app.McpMode(0);
+        HANDLE disabled=CreateFileW(PipeName().c_str(),GENERIC_READ|GENERIC_WRITE,0,nullptr,OPEN_EXISTING,0,nullptr);
+        Check(disabled==INVALID_HANDLE_VALUE,"MCP listener remained after disabling");if(disabled!=INVALID_HANDLE_VALUE)CloseHandle(disabled);
+        // Restart, then cancel a connected client that sends no data.
+        app.McpMode(1);HANDLE stalled=CreateFileW(PipeName().c_str(),GENERIC_READ|GENERIC_WRITE,0,nullptr,OPEN_EXISTING,0,nullptr);
+        Check(stalled!=INVALID_HANDLE_VALUE,"MCP restart failed");app.McpMode(0);if(stalled!=INVALID_HANDLE_VALUE)CloseHandle(stalled);
         for(size_t i=1;i<files.size();++i)app.Open(files[i]);
         size_t loaded=0;for(auto& doc:app.documents)if(doc->loaded)++loaded;Check(loaded<=3,"Clean editor buffer budget was exceeded");
         // Unsaved buffers must remain in memory, even while clean buffers are evicted.
