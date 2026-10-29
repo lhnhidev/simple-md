@@ -119,12 +119,12 @@ public:
         loading=true;
         d.editor=CreateWindowExW(0,MSFTEDIT_CLASS,L"Markdown source",WS_CHILD|WS_VSCROLL|WS_TABSTOP|ES_MULTILINE|ES_WANTRETURN|ES_NOHIDESEL,0,0,0,0,window,nullptr,nullptr,nullptr);
         SendMessageW(d.editor,EM_SETTEXTMODE,TM_PLAINTEXT,0);SendMessageW(d.editor,EM_EXLIMITTEXT,0,MAX_FILE_BYTES);
-        SendMessageW(d.editor,EM_SETUNDOLIMIT,80,0);SendMessageW(d.editor,EM_SETBKGNDCOLOR,0,PAPER);SendMessageW(d.editor,WM_SETFONT,(WPARAM)mono,FALSE);
+        SendMessageW(d.editor,EM_SETUNDOLIMIT,text.size()>131072?4:32,0);SendMessageW(d.editor,EM_SETBKGNDCOLOR,0,PAPER);SendMessageW(d.editor,WM_SETFONT,(WPARAM)mono,FALSE);
         SendMessageW(d.editor,EM_SETEVENTMASK,0,ENM_CHANGE|ENM_SELCHANGE);
         SetRichText(d.editor,EditorLines(text));SendMessageW(d.editor,EM_EMPTYUNDOBUFFER,0,0);SendMessageW(d.editor,EM_SETMODIFY,FALSE,0);
         loading=false;d.loaded=true;
     }
-    void Load(Document& d) { if(d.loaded)return;auto disk=ReadDocument(d.path);d.encoding=disk.encoding;d.crlf=disk.crlf;d.fingerprint=disk.fingerprint;Editor(d,disk.text); }
+    void Load(Document& d) { if(d.loaded)return;auto disk=ReadDocument(d.path);if(d.fingerprint&&d.fingerprint!=disk.fingerprint)++d.revision;d.encoding=disk.encoding;d.crlf=disk.crlf;d.fingerprint=disk.fingerprint;Editor(d,disk.text); }
     void Select(int index) {
         if(index<0||index>=(int)documents.size())return;
         try { Load(*documents[index]); }catch(...) {SendMessageW(list,LB_SETCURSEL,selected,0);throw;}
@@ -132,20 +132,24 @@ public:
         selected=index;documents[index]->touched=++clock;notice.clear();++generation;SetRichText(preview,L"");TrimEditors();RefreshList();Layout();QueuePreview();
         if(auto* d=Current())SetFocus(mode==0?preview:d->editor);
     }
-    void TrimEditors() {
-        // Keep at most three clean buffers. Unsaved documents are never evicted.
-        std::vector<Document*> clean;for(auto& d:documents)if(d->loaded&&!d->dirty)clean.push_back(d.get());
+    void TrimEditors(Document* preserve=nullptr) {
+        // Bound cached clean source payload, in addition to the control count.
+        // The current file and any in-flight MCP read can exceed this cache budget.
+        constexpr size_t budget=8*1024*1024;
+        std::vector<Document*> clean;size_t bytes=0;
+        auto cost=[](Document* d){GETTEXTLENGTHEX len{GTL_NUMCHARS,1200};return (size_t)SendMessageW(d->editor,EM_GETTEXTLENGTHEX,(WPARAM)&len,0)*sizeof(wchar_t);};
+        for(auto& d:documents)if(d->loaded&&!d->dirty){clean.push_back(d.get());bytes+=cost(d.get());}
         std::sort(clean.begin(),clean.end(),[](Document* a,Document* b){return a->touched<b->touched;});
-        size_t excess=clean.size()>3?clean.size()-3:0;
-        for(auto* d:clean){if(!excess)break;if(d==Current())continue;DestroyWindow(d->editor);d->editor=nullptr;d->loaded=false;--excess;}
+        size_t count=clean.size();
+        for(auto* d:clean){if(count<=3&&bytes<=budget)break;if(d==Current()||d==preserve)continue;bytes-=cost(d);DestroyWindow(d->editor);d->editor=nullptr;d->loaded=false;--count;}
     }
     void Open(const std::wstring& input,bool activate=true) {
         auto path=AbsolutePath(input);auto attrs=GetFileAttributesW(path.c_str());if(attrs==INVALID_FILE_ATTRIBUTES || attrs&FILE_ATTRIBUTE_DIRECTORY)throw std::runtime_error("File does not exist or is a directory.");
         auto name=FileName(path);auto ext=name.find_last_of(L'.');std::wstring suffix=ext==std::wstring::npos?L"":name.substr(ext);std::transform(suffix.begin(),suffix.end(),suffix.begin(),::towlower);
         if(suffix!=L".md"&&suffix!=L".markdown"&&suffix!=L".mdown"&&suffix!=L".txt")throw std::runtime_error("Open a .md, .markdown, .mdown, or .txt file.");
         for(size_t i=0;i<documents.size();++i)if(_wcsicmp(documents[i]->path.c_str(),path.c_str())==0){if(activate)Select((int)i);return;}
-        auto d=std::make_unique<Document>();d->id=nextId++;d->path=path;d->title=name;documents.push_back(std::move(d));RefreshList();
-        if(activate)Select((int)documents.size()-1);
+        auto d=std::make_unique<Document>();d->id=nextId++;d->path=path;d->title=name;documents.push_back(std::move(d));
+        if(activate){try{Select((int)documents.size()-1);}catch(...){documents.pop_back();RefreshList();throw;}}
     }
     void New() {
         auto d=std::make_unique<Document>();d->id=nextId++;d->title=L"Untitled "+std::to_wstring(d->id)+L".md";Editor(*d,L"");documents.push_back(std::move(d));mode=1;Select((int)documents.size()-1);
@@ -265,13 +269,14 @@ public:
                 std::string id=args.at("id").get<std::string>();Document* d=nullptr;for(auto& item:documents)if(std::to_string(item->id)==id){d=item.get();break;}if(!d)throw std::runtime_error("Document is not open. Ask the user to open it first.");
                 if(name=="read_document") {
                     for(auto& prop:args.items())if(prop.key()!="id"&&prop.key()!="offset"&&prop.key()!="limit")throw std::runtime_error("Unknown argument.");
-                    Load(*d);d->touched=++clock;TrimEditors();auto text=ControlText(d->editor);
+                    Load(*d);d->touched=++clock;TrimEditors(d);auto text=ControlText(d->editor);
                     auto integer=[&](const char* key,int fallback){if(!args.contains(key))return fallback;if(!args[key].is_number_integer())throw std::runtime_error("offset/limit must be integers.");return args[key].get<int>();};
                     int offset=integer("offset",0),limit=integer("limit",100000);if(offset<0||limit<1||limit>200000)throw std::runtime_error("offset must be >= 0; limit must be 1..200000.");
                     size_t start=text.size(),end=text.size(),points=0;
                     for(size_t i=0;i<text.size();) {if(points==(size_t)offset)start=i;if(points==(size_t)offset+(size_t)limit)end=i;++points;wchar_t c=text[i++];if(c>=0xd800&&c<=0xdbff&&i<text.size())++i;}
                     if(offset==points)start=text.size();if((size_t)offset>points)throw std::runtime_error("offset is beyond the end of the document.");
                     result={{"id",id},{"revision",d->revision},{"content",Utf8(text.substr(start,end-start))},{"offset",offset},{"totalCharacters",points},{"hasMore",(size_t)offset+(size_t)limit<points},{"unsaved",d->dirty}};
+                    TrimEditors();
                 } else {
                     for(auto& prop:args.items())if(prop.key()!="id"&&prop.key()!="revision"&&prop.key()!="content")throw std::runtime_error("Unknown argument.");
                     if(mcp!=2)throw std::runtime_error("Enable MCP Edit in the app before modifying text.");
@@ -279,7 +284,7 @@ public:
                     if(args.at("revision").get<uint64_t>()!=d->revision)throw std::runtime_error("Revision conflict: read the document again before updating.");
                     auto content=args.at("content").get<std::string>();if(content.size()>1000000)throw std::runtime_error("MCP edits are limited to 1 MB of UTF-8.");
                     auto w=Wide(content);if(w.find(L'\0')!=std::wstring::npos)throw std::runtime_error("NUL characters are not allowed.");
-                    SendMessageW(d->editor,EM_STOPGROUPTYPING,0,0);SendMessageW(d->editor,EM_SETSEL,0,-1);auto lines=EditorLines(w);SendMessageW(d->editor,EM_REPLACESEL,TRUE,(LPARAM)lines.c_str());SendMessageW(d->editor,EM_STOPGROUPTYPING,0,0);TrimEditors();
+                    SendMessageW(d->editor,EM_SETUNDOLIMIT,content.size()>131072?4:32,0);SendMessageW(d->editor,EM_STOPGROUPTYPING,0,0);SendMessageW(d->editor,EM_SETSEL,0,-1);auto lines=EditorLines(w);SendMessageW(d->editor,EM_REPLACESEL,TRUE,(LPARAM)lines.c_str());SendMessageW(d->editor,EM_STOPGROUPTYPING,0,0);TrimEditors();
                     result={{"id",id},{"revision",d->revision},{"unsaved",true},{"message","Changes staged in the editor. The user must review and press Ctrl+S to save."}};
                     notice=L"MCP updated "+d->title+L" · Review before saving";InvalidateRect(window,nullptr,FALSE);
                 }

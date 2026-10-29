@@ -91,6 +91,17 @@ int main(){
         Check(ControlText(app.Current()->editor).size()==big.size(),"Large file was truncated");
         app.QueuePreview();for(int i=0;i<10;++i){Pump();Sleep(10);}Check(PlainText(app.preview).find(L"Large document")!=std::wstring::npos,"Large preview guard did not activate");
         app.View(1);Check(PlainText(app.preview).empty(),"Edit mode retained rendered preview");
+        for(int i=0;i<2;++i){auto cached=folder+L"\\large-cache-"+std::to_wstring(i)+L".md";files.push_back(cached);AtomicWrite(cached,big,false);app.Open(cached);}
+        size_t cachedBytes=0;for(auto& doc:app.documents)if(doc->loaded&&!doc->dirty){GETTEXTLENGTHEX length{GTL_NUMCHARS,1200};cachedBytes+=(size_t)SendMessageW(doc->editor,EM_GETTEXTLENGTHEX,(WPARAM)&length,0)*2;}
+        Check(cachedBytes<=8*1024*1024,"Clean source payload exceeded the cache budget");
+        // Reloading an evicted file must invalidate previous MCP revisions if disk changed.
+        auto* evicted=app.documents[0].get();Check(!evicted->loaded,"Expected an inactive buffer to be evicted");auto oldRevision=evicted->revision;
+        AtomicWrite(evicted->path,"changed externally\n",true);
+        auto reloaded=app.Mcp({{"name","read_document"},{"arguments",{{"id",std::to_string(evicted->id)}}}});
+        // MCP is Off after the cancellation test; enable read without starting a listener.
+        Check(reloaded["isError"].get<bool>(),"Disabled MCP became accessible during cache activity");
+        app.mcp=1;reloaded=app.Mcp({{"name","read_document"},{"arguments",{{"id",std::to_string(evicted->id)}}}});
+        Check(!reloaded["isError"].get<bool>()&&Payload(reloaded)["revision"].get<uint64_t>()>oldRevision,"Evicted file reload did not update its revision");
         app.mcp=0;Check(app.Close(),"Application failed to close");DestroyWindow(window);
         for(auto& file:files)DeleteFileW(file.c_str());RemoveDirectoryW(folder.c_str());
         std::cout<<"PASS: "<<checks<<" checks; large file "<<big.size()<<" bytes opened in "<<elapsed<<" ms.\n";

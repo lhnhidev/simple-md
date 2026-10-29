@@ -27,7 +27,7 @@ Measured on the development machine (Windows 11 x64, 2026-10-29), using a fresh 
 
 Working set includes resident shared Windows DLL pages; private committed memory is a different metric and is not a substitute for total RAM usage. Every scenario recorded 0 ms CPU time during a one-second idle sample. A visible empty-window spot check was around 18 MiB working set. Results vary with Windows, display state, files, and usage; these are observations, not guaranteed limits. No artificial working-set trimming is used. See [raw results and methodology](benchmarks/memory-baseline.json).
 
-Clean inactive editor buffers are evicted to keep at most three loaded clean documents. Unsaved documents stay in memory. Preview is released in Edit mode and pauses above 400,000 characters. The editor accepts files up to 16 MiB. Folder browsing lists up to 2,000 Markdown files in the selected folder and loads contents on selection.
+Clean inactive editor buffers are evicted to keep at most three loaded clean documents and an 8 MiB clean source-text cache. The active file and unsaved documents are preserved even when they exceed that cache budget. Large files keep a shorter undo history. Preview is released in Edit mode and pauses above 400,000 characters. The editor accepts files up to 16 MiB. Folder browsing lists up to 2,000 Markdown files in the selected folder and loads contents on selection.
 
 ## MCP design
 

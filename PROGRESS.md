@@ -9,7 +9,7 @@ Project: `D:\workspace\simple-md`
 - [x] Hoàn thiện giao diện mở nhiều tài liệu, đọc/sửa/song song, tìm kiếm.
 - [x] Hoàn thiện lưu an toàn, kiểm tra xung đột khi file thay đổi bên ngoài.
 - [x] Biên dịch bản chạy: 488.448 bytes (477 KiB).
-- [x] Kiểm tra 75 điều kiện về Unicode, encoding, lưu/đọc, undo, quyền MCP, revision, cache và named pipe.
+- [x] Kiểm tra 79 điều kiện về Unicode, encoding, lưu/đọc, undo, quyền MCP, revision, cache và named pipe.
 - [x] Kiểm tra MCP stdio: handshake, notifications, tool discovery, ping, lỗi, mặc định tắt.
 - [x] Kiểm tra giao diện trống qua Computer Use; đã dừng theo trao đổi với người dùng.
 - [x] Viết hướng dẫn build/chạy/kết nối MCP trong README.
@@ -41,6 +41,14 @@ Project: `D:\workspace\simple-md`
 ## Cách cập nhật
 
 Commit và push lên `main` sau mỗi phần đã hoàn thành và kiểm tra được, theo yêu cầu người dùng.
+
+## Tối ưu cache
+
+- Giữ tối đa 3 tài liệu sạch đã nạp và áp dụng ngân sách 8 MiB nội dung nguồn sạch.
+- Không đẩy tài liệu đang thao tác hoặc có sửa chưa lưu ra khỏi bộ nhớ.
+- Giảm lịch sử undo cho tài liệu lớn; bỏ cập nhật danh sách theo từng file khi mở theo lô.
+- File bị đẩy khỏi cache rồi thay đổi trên đĩa sẽ tăng revision khi được nạp lại.
+- Mục tiêu tiếp theo theo yêu cầu: giảm working set cửa sổ trống về gần 5 MB bằng cách trì hoãn nạp thành phần Windows.
 
 MCP mặc định tắt. Khi được bật, chỉ tài liệu đang mở được chia sẻ.
 MCP Edit tạo thay đổi chưa lưu để người dùng kiểm tra trước khi Ctrl+S.
