@@ -2,7 +2,7 @@
 
 An ultra-lightweight native Windows Markdown editor built with C++. Read, edit, and save multiple files with a minimal UI and optional MCP integration for Claude and Codex.
 
-> **Status: working first build.** 82 native checks cover document handling, editor behavior, cache eviction, and the local MCP bridge. MCP stdio tests also pass. Memory benchmarks are recorded below.
+> **Status: working first build.** 84 native checks cover document handling, editor behavior, cache eviction, and the local MCP bridge, including a real stdio client connected to the editor. MCP stdio tests also pass. Memory benchmarks are recorded below.
 
 ## Goals
 

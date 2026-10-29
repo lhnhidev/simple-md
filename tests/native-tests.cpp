@@ -71,6 +71,14 @@ int main(){
         Check(!pipeList["isError"].get<bool>()&&Payload(pipeList).size()==1,"Named pipe listing failed");
         auto pipeRead=PipeCall(app,{{"name","read_document"},{"arguments",{{"id",id}}}});
         Check(Payload(pipeRead)["content"].get<std::string>()=="a🦀b","Named pipe read corrupted Unicode");
+        // Run the actual release executable in stdio mode against this isolated editor.
+        std::wstring clientCommand=L"node tests\\mcp-tests.mjs --connected";
+        STARTUPINFOW startup{sizeof(startup)};startup.dwFlags=STARTF_USESHOWWINDOW;startup.wShowWindow=SW_HIDE;PROCESS_INFORMATION client{};
+        Check(CreateProcessW(nullptr,clientCommand.data(),nullptr,nullptr,TRUE,CREATE_NO_WINDOW,nullptr,nullptr,&startup,&client)!=FALSE,"Cannot start end-to-end MCP client test");
+        DWORD waited=0;while(WaitForSingleObject(client.hProcess,0)==WAIT_TIMEOUT&&waited<15000){Pump();Sleep(1);++waited;}
+        if(waited>=15000)TerminateProcess(client.hProcess,1);
+        WaitForSingleObject(client.hProcess,1000);DWORD clientExit=1;GetExitCodeProcess(client.hProcess,&clientExit);CloseHandle(client.hThread);CloseHandle(client.hProcess);
+        Check(clientExit==0,"End-to-end MCP stdio-to-editor test failed");
         Json pipeUpdate={{"name","update_document"},{"arguments",{{"id",id},{"revision",d->revision},{"content","pipe edit"}}}};
         Check(PipeCall(app,pipeUpdate)["isError"].get<bool>(),"Named pipe ignored Read permission");
         app.McpMode(2);

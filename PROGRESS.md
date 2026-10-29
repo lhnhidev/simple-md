@@ -9,7 +9,7 @@ Project: `D:\workspace\simple-md`
 - [x] Hoàn thiện giao diện mở nhiều tài liệu, đọc/sửa/song song, tìm kiếm.
 - [x] Hoàn thiện lưu an toàn, kiểm tra xung đột khi file thay đổi bên ngoài.
 - [x] Biên dịch bản chạy: 488.448 bytes (477 KiB).
-- [x] Kiểm tra 82 điều kiện về Unicode, encoding, lưu/đọc, undo, quyền MCP, revision, cache và named pipe.
+- [x] Kiểm tra 84 điều kiện về Unicode, encoding, lưu/đọc, undo, quyền MCP, revision, cache và named pipe.
 - [x] Kiểm tra MCP stdio: handshake, notifications, tool discovery, ping, lỗi, mặc định tắt.
 - [x] Kiểm tra giao diện trống qua Computer Use; đã dừng theo trao đổi với người dùng.
 - [x] Viết hướng dẫn build/chạy/kết nối MCP trong README.
@@ -76,6 +76,13 @@ Commit và push lên `main` sau mỗi phần đã hoàn thành và kiểm tra đ
 - Kết quả và cách đo đã lưu trong `benchmarks/memory-current.json`, `memory-empty-modules.json`, `memory-floor.json`.
 - Không dùng cách ép trim working set, không tắt IME và không thay đổi thiết lập Windows.
 - Đã hỏi người dùng muốn áp dụng 5 MB cho cột Memory của Task Manager hay tổng working set; đang chờ làm rõ. Không coi mục tiêu 5 MB tổng working set là đã đạt.
+
+## Kiểm tra MCP toàn tuyến
+
+- Chạy một client Node.js gọi đúng bản release `simple-md.exe --mcp`.
+- Client khởi tạo protocol, liệt kê tài liệu và đọc Unicode qua stdio → named pipe → editor.
+- Kiểm tra chế độ Read từ chối sửa qua toàn bộ tuyến kết nối.
+- Client và editor kiểm thử dùng dữ liệu mẫu riêng; không sửa cấu hình Claude/Codex của người dùng.
 
 MCP mặc định tắt. Khi được bật, chỉ tài liệu đang mở được chia sẻ.
 MCP Edit tạo thay đổi chưa lưu để người dùng kiểm tra trước khi Ctrl+S.
