@@ -1,0 +1,64 @@
+{
+    "measuredAt":  "2026-10-29T10:00:22.9019334+07:00",
+    "executableBytes":  492032,
+    "os":  "Microsoft Windows NT 10.0.26200.0",
+    "processArchitecture":  "x64",
+    "methodology":  "Fresh hidden native application per scenario, 1.2 seconds settling, 1 second idle CPU sampling. Working set includes shared DLL pages; private bytes are committed private memory. 30 files are listed, with only the first loaded. No working-set trimming is performed.",
+    "results":  [
+                    {
+                        "scenario":  "empty",
+                        "listedFiles":  0,
+                        "fixtureBytes":  0,
+                        "workingSetBytes":  10985472,
+                        "privateBytes":  1826816,
+                        "workingSetMiB":  10.48,
+                        "privateMiB":  1.74,
+                        "startupToMessageLoopMs":  137,
+                        "idleCpuMsInOneSecond":  0
+                    },
+                    {
+                        "scenario":  "one-small-file",
+                        "listedFiles":  1,
+                        "fixtureBytes":  2670,
+                        "workingSetBytes":  16474112,
+                        "privateBytes":  2367488,
+                        "workingSetMiB":  15.71,
+                        "privateMiB":  2.26,
+                        "startupToMessageLoopMs":  178,
+                        "idleCpuMsInOneSecond":  0
+                    },
+                    {
+                        "scenario":  "30-listed-small-files",
+                        "listedFiles":  30,
+                        "fixtureBytes":  80100,
+                        "workingSetBytes":  16478208,
+                        "privateBytes":  2494464,
+                        "workingSetMiB":  15.71,
+                        "privateMiB":  2.38,
+                        "startupToMessageLoopMs":  187,
+                        "idleCpuMsInOneSecond":  0
+                    },
+                    {
+                        "scenario":  "medium-preview",
+                        "listedFiles":  1,
+                        "fixtureBytes":  178000,
+                        "workingSetBytes":  19087360,
+                        "privateBytes":  5218304,
+                        "workingSetMiB":  18.2,
+                        "privateMiB":  4.98,
+                        "startupToMessageLoopMs":  301,
+                        "idleCpuMsInOneSecond":  0
+                    },
+                    {
+                        "scenario":  "large-file-preview-paused",
+                        "listedFiles":  1,
+                        "fixtureBytes":  1780000,
+                        "workingSetBytes":  24240128,
+                        "privateBytes":  10686464,
+                        "workingSetMiB":  23.12,
+                        "privateMiB":  10.19,
+                        "startupToMessageLoopMs":  440,
+                        "idleCpuMsInOneSecond":  0
+                    }
+                ]
+}

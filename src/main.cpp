@@ -12,6 +12,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <atomic>
+#include <cstdlib>
 
 namespace {
 constexpr wchar_t WINDOW_CLASS[]=L"simple-md.NativeWindow";
@@ -64,8 +65,10 @@ public:
     unsigned pendingDoc=0;
     uint64_t generation=0,pendingGeneration=0;
     bool renderStop=false,renderPending=false;
+    HMODULE richModule=nullptr;
+    bool comInitialized=false;
 
-    ~Application() { closing=true;mcp=0;StopMcpPipe();StopWorker();DeleteObject(white);DeleteFonts(); }
+    ~Application() { closing=true;mcp=0;StopMcpPipe();StopWorker();DeleteObject(white);DeleteFonts();if(richModule)FreeLibrary(richModule);if(comInitialized)CoUninitialize(); }
     int P(int value)const{return MulDiv(value,dpi,96);}
     Document* Current(){return selected>=0&&selected<(int)documents.size()?documents[selected].get():nullptr;}
     void DeleteFonts(){for(auto f:{ui,bold,smallFont,heading,mono})if(f)DeleteObject(f);ui=bold=smallFont=heading=mono=nullptr;}
@@ -86,14 +89,26 @@ public:
         Button(L"Read",ID_READ);Button(L"Edit",ID_EDIT);Button(L"Split",ID_SPLIT);Button(L"MCP: Off",ID_MCP);Button(L"More",ID_MORE);
         list=CreateWindowExW(0,L"LISTBOX",L"Open documents",WS_CHILD|WS_VISIBLE|WS_TABSTOP|WS_VSCROLL|LBS_NOTIFY|LBS_OWNERDRAWFIXED|LBS_NOINTEGRALHEIGHT|LBS_HASSTRINGS,0,0,0,0,window,(HMENU)ID_FILES,nullptr,nullptr);
         SendMessageW(list,WM_SETFONT,(WPARAM)ui,FALSE);SendMessageW(list,LB_SETITEMHEIGHT,0,P(44));
+        Layout();
+    }
+    void EnsureCom() {if(!comInitialized){if(FAILED(CoInitializeEx(nullptr,COINIT_APARTMENTTHREADED)))throw std::runtime_error("Cannot initialize the Windows file dialog.");comInitialized=true;}}
+    void EnsureRich() {if(!richModule){richModule=LoadLibraryW(L"Msftedit.dll");if(!richModule)throw std::runtime_error("Windows RichEdit is unavailable.");}}
+    void EnsurePreview() {
+        if(preview)return;EnsureRich();
         preview=CreateWindowExW(0,MSFTEDIT_CLASS,L"Markdown preview",WS_CHILD|WS_VSCROLL|ES_MULTILINE|ES_READONLY,0,0,0,0,window,nullptr,nullptr,nullptr);
-        SendMessageW(preview,EM_SETBKGNDCOLOR,0,PAPER);SendMessageW(preview,EM_EXLIMITTEXT,0,MAX_FILE_BYTES*2);
-        SendMessageW(preview,EM_SETUNDOLIMIT,0,0);
+        if(!preview)throw std::runtime_error("Cannot create Markdown preview.");
+        SendMessageW(preview,EM_SETBKGNDCOLOR,0,PAPER);SendMessageW(preview,EM_EXLIMITTEXT,0,MAX_FILE_BYTES*2);SendMessageW(preview,EM_SETUNDOLIMIT,0,0);Layout();
+    }
+    void EnsureFind() {
+        if(findInput)return;
         findInput=CreateWindowExW(WS_EX_CLIENTEDGE,L"EDIT",L"",WS_CHILD|WS_TABSTOP|ES_AUTOHSCROLL,0,0,0,0,window,(HMENU)ID_FINDINPUT,nullptr,nullptr);
         SendMessageW(findInput,WM_SETFONT,(WPARAM)ui,FALSE);SendMessageW(findInput,EM_SETCUEBANNER,TRUE,(LPARAM)L"Find in document…");
         findNext=Button(L"Next",ID_FINDNEXT);findClose=Button(L"Close",ID_FINDCLOSE);
         ShowWindow(findNext,SW_HIDE);ShowWindow(findClose,SW_HIDE);
-        DragAcceptFiles(window,TRUE);
+    }
+    void StartWorker() {
+        if(renderer.joinable())return;
+        {std::lock_guard<std::mutex> lock(renderMutex);renderStop=false;}
         renderer=std::thread([this] {
             for(;;) {
                 std::string source;unsigned id;uint64_t gen;
@@ -104,7 +119,6 @@ public:
                 if(PostMessageW(window,WM_PREVIEW_READY,0,(LPARAM)result.get()))result.release();
             }
         });
-        Layout();
     }
     void StopWorker(){ {std::lock_guard<std::mutex> lock(renderMutex);renderStop=true;}renderCondition.notify_one();if(renderer.joinable())renderer.join(); }
     void Error(const std::exception& e){MessageBoxW(window,Wide(e.what()).c_str(),L"simple-md",MB_OK|MB_ICONWARNING);}
@@ -116,8 +130,10 @@ public:
         InvalidateRect(window,nullptr,FALSE);
     }
     void Editor(Document& d,const std::wstring& text) {
+        EnsureRich();
         loading=true;
         d.editor=CreateWindowExW(0,MSFTEDIT_CLASS,L"Markdown source",WS_CHILD|WS_VSCROLL|WS_TABSTOP|ES_MULTILINE|ES_WANTRETURN|ES_NOHIDESEL,0,0,0,0,window,nullptr,nullptr,nullptr);
+        if(!d.editor)throw std::runtime_error("Cannot create document editor.");
         SendMessageW(d.editor,EM_SETTEXTMODE,TM_PLAINTEXT,0);SendMessageW(d.editor,EM_EXLIMITTEXT,0,MAX_FILE_BYTES);
         SendMessageW(d.editor,EM_SETUNDOLIMIT,text.size()>131072?4:32,0);SendMessageW(d.editor,EM_SETBKGNDCOLOR,0,PAPER);SendMessageW(d.editor,WM_SETFONT,(WPARAM)mono,FALSE);
         SendMessageW(d.editor,EM_SETEVENTMASK,0,ENM_CHANGE|ENM_SELCHANGE);
@@ -155,12 +171,14 @@ public:
         auto d=std::make_unique<Document>();d->id=nextId++;d->title=L"Untitled "+std::to_wstring(d->id)+L".md";Editor(*d,L"");documents.push_back(std::move(d));mode=1;Select((int)documents.size()-1);
     }
     void OpenDialog() {
+        EnsureCom();
         std::vector<wchar_t> buffer(65536);OPENFILENAMEW of{sizeof(of)};of.hwndOwner=window;of.lpstrFilter=L"Markdown and text\0*.md;*.markdown;*.mdown;*.txt\0All files\0*.*\0";of.lpstrFile=buffer.data();of.nMaxFile=(DWORD)buffer.size();of.Flags=OFN_EXPLORER|OFN_ALLOWMULTISELECT|OFN_FILEMUSTEXIST|OFN_NOCHANGEDIR;
         if(!GetOpenFileNameW(&of))return;
         std::wstring first=buffer.data();wchar_t* rest=buffer.data()+first.size()+1;
         if(!*rest)Open(first);else {int firstIndex=(int)documents.size();while(*rest){Open(first+L"\\"+rest,false);rest+=wcslen(rest)+1;}Select(std::min(firstIndex,(int)documents.size()-1));}
     }
     void FolderDialog() {
+        EnsureCom();
         IFileOpenDialog* dialog=nullptr;if(FAILED(CoCreateInstance(CLSID_FileOpenDialog,nullptr,CLSCTX_INPROC_SERVER,IID_PPV_ARGS(&dialog))))return;
         DWORD options=0;dialog->GetOptions(&options);dialog->SetOptions(options|FOS_PICKFOLDERS|FOS_FORCEFILESYSTEM|FOS_NOCHANGEDIR);dialog->SetTitle(L"Open Markdown files in a folder (contents load on selection)");
         std::wstring folder;
@@ -178,6 +196,7 @@ public:
         if(!d.loaded)return true;
         std::wstring path=d.path;bool newPath=path.empty()||saveAs;
         if(newPath) {
+            EnsureCom();
             std::vector<wchar_t> buffer(32768);auto suggested=d.path.empty()?d.title:d.path;wcsncpy_s(buffer.data(),buffer.size(),suggested.c_str(),_TRUNCATE);
             OPENFILENAMEW of{sizeof(of)};of.hwndOwner=window;of.lpstrFilter=L"Markdown\0*.md\0Text\0*.txt\0";of.lpstrDefExt=L"md";of.lpstrFile=buffer.data();of.nMaxFile=(DWORD)buffer.size();of.Flags=OFN_OVERWRITEPROMPT|OFN_NOCHANGEDIR|OFN_PATHMUSTEXIST;
             if(!GetSaveFileNameW(&of))return false;path=AbsolutePath(buffer.data());
@@ -224,6 +243,7 @@ public:
     }
     void QueuePreview() {
         KillTimer(window,1);auto* d=Current();if(!d||!d->loaded||mode==1)return;
+        EnsurePreview();StartWorker();
         std::string source;
         GETTEXTLENGTHEX len{GTL_NUMCHARS,1200};auto count=SendMessageW(d->editor,EM_GETTEXTLENGTHEX,(WPARAM)&len,0);
         if(count>400000)source="# Large document\n\nPreview is paused above 400,000 characters to keep memory and typing responsive. Use **Edit** to read, search, and change the complete file.";
@@ -236,8 +256,8 @@ public:
         Stream stream{&result->rtf,0};EDITSTREAM edit{(DWORD_PTR)&stream,0,RtfStream};SendMessageW(preview,EM_STREAMIN,SF_RTF,(LPARAM)&edit);
         SendMessageW(preview,EM_SETSCROLLPOS,0,(LPARAM)&scroll);SendMessageW(preview,WM_SETREDRAW,TRUE,0);InvalidateRect(preview,nullptr,TRUE);
     }
-    void View(int next) {mode=next;++generation;if(mode==1){SetRichText(preview,L"");std::lock_guard<std::mutex> lock(renderMutex);renderPending=false;pendingSource.clear();pendingSource.shrink_to_fit();}Layout();QueuePreview();InvalidateRect(window,nullptr,FALSE);for(HWND b:buttons)InvalidateRect(b,nullptr,FALSE);if(auto* d=Current())SetFocus(mode==0?preview:d->editor);}
-    void Find(bool show) {findVisible=show;Layout();if(show){SetFocus(findInput);SendMessageW(findInput,EM_SETSEL,0,-1);}else if(auto* d=Current())SetFocus(mode==0?preview:d->editor);}
+    void View(int next) {mode=next;++generation;if(mode==1){if(preview){DestroyWindow(preview);preview=nullptr;}std::lock_guard<std::mutex> lock(renderMutex);renderPending=false;pendingSource.clear();pendingSource.shrink_to_fit();}Layout();QueuePreview();InvalidateRect(window,nullptr,FALSE);for(HWND b:buttons)InvalidateRect(b,nullptr,FALSE);if(auto* d=Current())SetFocus(mode==0?preview:d->editor);}
+    void Find(bool show) {if(show)EnsureFind();findVisible=show;Layout();if(show){SetFocus(findInput);SendMessageW(findInput,EM_SETSEL,0,-1);}else if(auto* d=Current())SetFocus(mode==0?preview:d->editor);}
     void FindNext() {
         auto query=PlainText(findInput);if(query.empty())return;auto* d=Current();if(!d)return;HWND target=mode==0?preview:d->editor;
         CHARRANGE selection{};SendMessageW(target,EM_EXGETSEL,0,(LPARAM)&selection);FINDTEXTEXW find{{selection.cpMax,-1},query.c_str(),{}};
@@ -400,19 +420,16 @@ LRESULT CALLBACK WindowProc(HWND window,UINT message,WPARAM w,LPARAM l) {
 }
 }
 int WINAPI wWinMain(HINSTANCE instance,HINSTANCE,LPWSTR,int show) {
-    int argc=0;LPWSTR* argv=CommandLineToArgvW(GetCommandLineW(),&argc);
-    if(argc>1&&std::wstring(argv[1])==L"--mcp"){LocalFree(argv);try{return RunMcp();}catch(...){return 1;}}
-    CoInitializeEx(nullptr,COINIT_APARTMENTTHREADED);
+    int argc=__argc;wchar_t** argv=__wargv;
+    if(argc>1&&std::wstring(argv[1])==L"--mcp"){try{return RunMcp();}catch(...){return 1;}}
     try {
-        std::wstring mutexName=L"Local\\simple-md-"+UserSid();HANDLE mutex=CreateMutexW(nullptr,FALSE,mutexName.c_str());
-        if(GetLastError()==ERROR_ALREADY_EXISTS){HWND running=FindWindowW(WINDOW_CLASS,nullptr);if(running){for(int i=1;i<argc;++i){auto path=AbsolutePath(argv[i]);COPYDATASTRUCT copy{1,(DWORD)((path.size()+1)*2),(void*)path.c_str()};SendMessageW(running,WM_COPYDATA,0,(LPARAM)&copy);}ShowWindow(running,SW_RESTORE);SetForegroundWindow(running);}CloseHandle(mutex);LocalFree(argv);CoUninitialize();return 0;}
-        HMODULE rich=LoadLibraryW(L"Msftedit.dll");if(!rich)throw std::runtime_error("Windows RichEdit is unavailable.");
-        INITCOMMONCONTROLSEX controls{sizeof(controls),ICC_STANDARD_CLASSES};InitCommonControlsEx(&controls);
+        HANDLE mutex=CreateMutexW(nullptr,FALSE,L"Local\\simple-md.NativeWindow");
+        if(!mutex)throw std::runtime_error("Cannot create the application session lock.");
+        if(GetLastError()==ERROR_ALREADY_EXISTS){HWND running=FindWindowW(WINDOW_CLASS,nullptr);if(running){for(int i=1;i<argc;++i){auto path=AbsolutePath(argv[i]);COPYDATASTRUCT copy{1,(DWORD)((path.size()+1)*2),(void*)path.c_str()};SendMessageW(running,WM_COPYDATA,0,(LPARAM)&copy);}ShowWindow(running,SW_RESTORE);SetForegroundWindow(running);}CloseHandle(mutex);return 0;}
         WNDCLASSEXW wc{sizeof(wc)};wc.lpfnWndProc=WindowProc;wc.hInstance=instance;wc.lpszClassName=WINDOW_CLASS;wc.hCursor=LoadCursorW(nullptr,IDC_ARROW);wc.hIcon=LoadIconW(nullptr,IDI_APPLICATION);RegisterClassExW(&wc);
-        Application app;int scale=(int)GetDpiForSystem();HWND window=CreateWindowExW(0,WINDOW_CLASS,L"simple-md",WS_OVERLAPPEDWINDOW|WS_CLIPCHILDREN,CW_USEDEFAULT,CW_USEDEFAULT,MulDiv(1180,scale,96),MulDiv(790,scale,96),nullptr,nullptr,instance,&app);
+        Application app;int scale=(int)GetDpiForSystem();HWND window=CreateWindowExW(WS_EX_ACCEPTFILES,WINDOW_CLASS,L"simple-md",WS_OVERLAPPEDWINDOW|WS_CLIPCHILDREN,CW_USEDEFAULT,CW_USEDEFAULT,MulDiv(1180,scale,96),MulDiv(790,scale,96),nullptr,nullptr,instance,&app);
         if(!window)throw std::runtime_error("Could not create the application window.");
-        COLORREF caption=PAPER;DwmSetWindowAttribute(window,35,&caption,sizeof(caption));
-        for(int i=1;i<argc;++i)try{app.Open(argv[i],false);}catch(const std::exception& e){app.Error(e);}LocalFree(argv);argv=nullptr;
+        for(int i=1;i<argc;++i)try{app.Open(argv[i],false);}catch(const std::exception& e){app.Error(e);}
         if(!app.documents.empty())try{app.Select(0);}catch(const std::exception& e){app.Error(e);}
         ShowWindow(window,show);UpdateWindow(window);
         ACCEL keys[]={
@@ -426,7 +443,7 @@ int WINAPI wWinMain(HINSTANCE instance,HINSTANCE,LPWSTR,int show) {
             if(message.message==WM_KEYDOWN&&message.hwnd==app.findInput&&message.wParam==VK_RETURN){app.FindNext();continue;}
             if(!TranslateAcceleratorW(window,accelerators,&message)){TranslateMessage(&message);DispatchMessageW(&message);}
         }
-        DestroyAcceleratorTable(accelerators);CloseHandle(mutex);FreeLibrary(rich);
-    }catch(const std::exception& e){MessageBoxW(nullptr,Wide(e.what()).c_str(),L"simple-md",MB_OK|MB_ICONERROR);if(argv)LocalFree(argv);CoUninitialize();return 1;}
-    CoUninitialize();return 0;
+        DestroyAcceleratorTable(accelerators);CloseHandle(mutex);
+    }catch(const std::exception& e){MessageBoxW(nullptr,Wide(e.what()).c_str(),L"simple-md",MB_OK|MB_ICONERROR);return 1;}
+    return 0;
 }
