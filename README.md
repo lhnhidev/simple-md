@@ -2,7 +2,7 @@
 
 An ultra-lightweight native Windows Markdown editor built with C++. Read, edit, and save multiple files with a minimal UI and optional MCP integration for Claude and Codex.
 
-> **Status: working first build.** Document handling, MCP stdio, and the local MCP bridge pass automated tests. Memory benchmarks are recorded below. Portable packaging is in progress.
+> **Status: working first build.** 82 native checks cover document handling, editor behavior, cache eviction, and the local MCP bridge. MCP stdio tests also pass. Memory benchmarks are recorded below.
 
 ## Goals
 
@@ -13,21 +13,27 @@ An ultra-lightweight native Windows Markdown editor built with C++. Read, edit, 
 - Load document contents on demand and render previews only when needed.
 - Offer optional local MCP integration so Claude or Codex can work with open documents.
 
-Memory usage depends on file sizes, the number of loaded documents, and the active view. There is no fixed 1 MB RAM promise. The current release executable is **488,448 bytes (477 KiB)**.
+Memory usage depends on file sizes, the number of loaded documents, and the active view. There is no fixed RAM promise. The current release executable is **492,032 bytes (480.5 KiB)**.
 
 Measured on the development machine (Windows 11 x64, 2026-10-29), using a fresh hidden process and synthetic files for each scenario:
 
-| Scenario | Working set | Private committed memory |
-| --- | ---: | ---: |
-| Empty window | 15.07 MiB | 2.39 MiB |
-| One 2.67 KB file | 17.55 MiB | 2.74 MiB |
-| 30 listed small files, first loaded | 17.58 MiB | 2.77 MiB |
-| 178 KB file with preview | 19.15 MiB | 4.29 MiB |
-| 1.78 MB file, preview paused | 25.06 MiB | 10.55 MiB |
+| Scenario | Total working set | Private working set | Private committed memory |
+| --- | ---: | ---: | ---: |
+| Empty window | 10.42 MiB | 1.05 MiB | 1.64 MiB |
+| One 2.67 KB file | 15.71 MiB | 1.66 MiB | 2.39 MiB |
+| 30 listed small files, first loaded | 15.70 MiB | 1.65 MiB | 2.39 MiB |
+| 178 KB file with preview | 18.29 MiB | 4.25 MiB | 4.97 MiB |
+| 1.78 MB file, preview paused | 23.10 MiB | 9.25 MiB | 9.95 MiB |
 
-Working set includes resident shared Windows DLL pages; private committed memory is a different metric and is not a substitute for total RAM usage. Every scenario recorded 0 ms CPU time during a one-second idle sample. A visible empty-window spot check was around 18 MiB working set. Results vary with Windows, display state, files, and usage; these are observations, not guaranteed limits. No artificial working-set trimming is used. See [raw results and methodology](benchmarks/memory-baseline.json).
+Total working set includes resident shared Windows DLL pages. Private working set counts resident pages exclusive to this process; private committed memory includes private allocations that may not currently reside in RAM. These metrics are reported separately. Microsoft's [explanation of Task Manager memory](https://blogs.windows.com/msedgedev/2021/01/13/investigate-microsoft-edge-memory-usage/) describes the default Memory column as private working set.
+
+**The requested 5 MB empty-window target has not been reached for total working set.** The measured private working set is below 5 MB in the synthetic empty-window test. A diagnostic program that only creates a bare hidden Win32 window measured 6.48 MiB total working set on this machine; this is an observed comparison, not a universal Windows minimum. No IME/text input support is disabled to reduce memory.
+
+Every scenario recorded 0 ms CPU time during a one-second idle sample. Results vary with Windows, display state, files, and usage; these are observations, not guaranteed limits. No artificial working-set trimming is used. See [current raw results](benchmarks/memory-current.json), [resident module breakdown](benchmarks/memory-empty-modules.json), and [control-window results](benchmarks/memory-floor.json). Earlier [baseline](benchmarks/memory-baseline.json) and [deferred-loading measurements](benchmarks/memory-deferred.json) remain available for comparison.
 
 Clean inactive editor buffers are evicted to keep at most three loaded clean documents and an 8 MiB clean source-text cache. The active file and unsaved documents are preserved even when they exceed that cache budget. Large files keep a shorter undo history. Preview is released in Edit mode and pauses above 400,000 characters. The editor accepts files up to 16 MiB. Folder browsing lists up to 2,000 Markdown files in the selected folder and loads contents on selection.
+
+The empty window does not create an editor, preview, search field, or renderer thread. RichEdit and the renderer are released when the last document closes. File dialog, shell, COM, and MCP permission libraries are loaded only when their features need them.
 
 ## MCP design
 

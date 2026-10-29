@@ -1,0 +1,90 @@
+{
+    "measuredAt":  "2026-10-29T10:08:31.2418652+07:00",
+    "executable":  "build\\minimal-window.exe",
+    "executableBytes":  3072,
+    "workingSetBytes":  6795264,
+    "privateCommittedBytes":  1101824,
+    "privateWorkingSetBytes":  708608,
+    "modules":  [
+                    {
+                        "module":  "minimal-window.exe",
+                        "residentKiB":  16,
+                        "mappedKiB":  20
+                    },
+                    {
+                        "module":  "ntdll.dll",
+                        "residentKiB":  1972,
+                        "mappedKiB":  2464
+                    },
+                    {
+                        "module":  "KERNEL32.DLL",
+                        "residentKiB":  252,
+                        "mappedKiB":  812
+                    },
+                    {
+                        "module":  "KERNELBASE.dll",
+                        "residentKiB":  784,
+                        "mappedKiB":  4100
+                    },
+                    {
+                        "module":  "USER32.dll",
+                        "residentKiB":  380,
+                        "mappedKiB":  1884
+                    },
+                    {
+                        "module":  "win32u.dll",
+                        "residentKiB":  108,
+                        "mappedKiB":  156
+                    },
+                    {
+                        "module":  "GDI32.dll",
+                        "residentKiB":  136,
+                        "mappedKiB":  172
+                    },
+                    {
+                        "module":  "gdi32full.dll",
+                        "residentKiB":  224,
+                        "mappedKiB":  1192
+                    },
+                    {
+                        "module":  "msvcp_win.dll",
+                        "residentKiB":  188,
+                        "mappedKiB":  652
+                    },
+                    {
+                        "module":  "ucrtbase.dll",
+                        "residentKiB":  400,
+                        "mappedKiB":  1328
+                    },
+                    {
+                        "module":  "IMM32.DLL",
+                        "residentKiB":  76,
+                        "mappedKiB":  196
+                    },
+                    {
+                        "module":  "uxtheme.dll",
+                        "residentKiB":  300,
+                        "mappedKiB":  668
+                    },
+                    {
+                        "module":  "combase.dll",
+                        "residentKiB":  332,
+                        "mappedKiB":  3628
+                    },
+                    {
+                        "module":  "RPCRT4.dll",
+                        "residentKiB":  100,
+                        "mappedKiB":  1120
+                    },
+                    {
+                        "module":  "MSCTF.dll",
+                        "residentKiB":  328,
+                        "mappedKiB":  1392
+                    },
+                    {
+                        "module":  "msvcrt.dll",
+                        "residentKiB":  220,
+                        "mappedKiB":  676
+                    }
+                ]
+}

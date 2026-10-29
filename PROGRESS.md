@@ -67,5 +67,15 @@ Commit và push lên `main` sau mỗi phần đã hoàn thành và kiểm tra đ
 - Bản hiện tại: 492.032 bytes; cửa sổ trống khoảng 10,42 MiB tổng working set.
 - Mục tiêu 5 MB tổng working set vẫn chưa đạt. Bộ đo riêng từng loại RAM đang được cập nhật để tránh nhầm giữa private memory và DLL dùng chung.
 
+## Đo RAM riêng và DLL dùng chung
+
+- Bài đo mới ghi đủ tổng working set, private working set và private committed memory.
+- Trống: 10,42 / 1,05 / 1,64 MiB theo ba chỉ số trên.
+- Một file nhỏ: 15,71 / 1,66 / 2,39 MiB.
+- Đối chứng chỉ có một cửa sổ Win32: 6,48 MiB tổng working set / 0,68 MiB private working set.
+- Kết quả và cách đo đã lưu trong `benchmarks/memory-current.json`, `memory-empty-modules.json`, `memory-floor.json`.
+- Không dùng cách ép trim working set, không tắt IME và không thay đổi thiết lập Windows.
+- Đã hỏi người dùng muốn áp dụng 5 MB cho cột Memory của Task Manager hay tổng working set; đang chờ làm rõ. Không coi mục tiêu 5 MB tổng working set là đã đạt.
+
 MCP mặc định tắt. Khi được bật, chỉ tài liệu đang mở được chia sẻ.
 MCP Edit tạo thay đổi chưa lưu để người dùng kiểm tra trước khi Ctrl+S.

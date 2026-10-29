@@ -1,0 +1,74 @@
+{
+    "measuredAt":  "2026-10-29T10:08:27.3147576+07:00",
+    "executableBytes":  492032,
+    "os":  "Microsoft Windows NT 10.0.26200.0",
+    "processArchitecture":  "x64",
+    "methodology":  "Fresh hidden native application per scenario, 1.2 seconds settling, 1 second idle CPU sampling. Working set includes shared DLL pages; private bytes are committed private memory; private working set counts resident pages not marked shared by QueryWorkingSet. 30 files are listed, with only the first loaded. No working-set trimming is performed.",
+    "results":  [
+                    {
+                        "scenario":  "empty",
+                        "listedFiles":  0,
+                        "fixtureBytes":  0,
+                        "workingSetBytes":  10924032,
+                        "privateBytes":  1716224,
+                        "privateWorkingSetBytes":  1097728,
+                        "workingSetMiB":  10.42,
+                        "privateMiB":  1.64,
+                        "privateWorkingSetMiB":  1.05,
+                        "startupToMessageLoopMs":  200,
+                        "idleCpuMsInOneSecond":  0
+                    },
+                    {
+                        "scenario":  "one-small-file",
+                        "listedFiles":  1,
+                        "fixtureBytes":  2670,
+                        "workingSetBytes":  16474112,
+                        "privateBytes":  2510848,
+                        "privateWorkingSetBytes":  1744896,
+                        "workingSetMiB":  15.71,
+                        "privateMiB":  2.39,
+                        "privateWorkingSetMiB":  1.66,
+                        "startupToMessageLoopMs":  93,
+                        "idleCpuMsInOneSecond":  0
+                    },
+                    {
+                        "scenario":  "30-listed-small-files",
+                        "listedFiles":  30,
+                        "fixtureBytes":  80100,
+                        "workingSetBytes":  16457728,
+                        "privateBytes":  2506752,
+                        "privateWorkingSetBytes":  1728512,
+                        "workingSetMiB":  15.7,
+                        "privateMiB":  2.39,
+                        "privateWorkingSetMiB":  1.65,
+                        "startupToMessageLoopMs":  151,
+                        "idleCpuMsInOneSecond":  0
+                    },
+                    {
+                        "scenario":  "medium-preview",
+                        "listedFiles":  1,
+                        "fixtureBytes":  178000,
+                        "workingSetBytes":  19181568,
+                        "privateBytes":  5214208,
+                        "privateWorkingSetBytes":  4460544,
+                        "workingSetMiB":  18.29,
+                        "privateMiB":  4.97,
+                        "privateWorkingSetMiB":  4.25,
+                        "startupToMessageLoopMs":  150,
+                        "idleCpuMsInOneSecond":  0
+                    },
+                    {
+                        "scenario":  "large-file-preview-paused",
+                        "listedFiles":  1,
+                        "fixtureBytes":  1780000,
+                        "workingSetBytes":  24219648,
+                        "privateBytes":  10428416,
+                        "privateWorkingSetBytes":  9695232,
+                        "workingSetMiB":  23.1,
+                        "privateMiB":  9.95,
+                        "privateWorkingSetMiB":  9.25,
+                        "startupToMessageLoopMs":  245,
+                        "idleCpuMsInOneSecond":  0
+                    }
+                ]
+}

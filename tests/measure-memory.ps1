@@ -2,6 +2,7 @@ param([string]$OutputPath='build\memory-results.json')
 $ErrorActionPreference='Stop'
 $projectRoot=Split-Path $PSScriptRoot -Parent
 Set-Location $projectRoot
+. (Join-Path $PSScriptRoot 'working-set.ps1')
 $exe=Join-Path $projectRoot 'dist\simple-md.exe'
 if(-not (Test-Path -LiteralPath $exe)){throw 'Build dist\simple-md.exe first.'}
 if(Get-Process -Name simple-md -ErrorAction SilentlyContinue){throw 'Close simple-md before running the isolated memory benchmark.'}
@@ -45,6 +46,7 @@ foreach($case in $cases){
         $cpuStart=$process.TotalProcessorTime.TotalMilliseconds
         $workingSet=$process.WorkingSet64
         $privateBytes=$process.PrivateMemorySize64
+        $privateWorkingSet=[ResidentPages]::PrivateWorkingSet($process.Handle)
         Start-Sleep -Milliseconds 1000
         $process.Refresh()
         $results+=[pscustomobject]@{
@@ -53,8 +55,10 @@ foreach($case in $cases){
             fixtureBytes=($case.Paths | ForEach-Object {(Get-Item -LiteralPath $_).Length} | Measure-Object -Sum).Sum
             workingSetBytes=$workingSet
             privateBytes=$privateBytes
+            privateWorkingSetBytes=$privateWorkingSet
             workingSetMiB=[Math]::Round($workingSet/1MB,2)
             privateMiB=[Math]::Round($privateBytes/1MB,2)
+            privateWorkingSetMiB=[Math]::Round($privateWorkingSet/1MB,2)
             startupToMessageLoopMs=$watch.ElapsedMilliseconds
             idleCpuMsInOneSecond=[Math]::Round($process.TotalProcessorTime.TotalMilliseconds-$cpuStart,2)
         }
@@ -69,10 +73,10 @@ $report=[ordered]@{
     executableBytes=(Get-Item -LiteralPath $exe).Length
     os=[Environment]::OSVersion.VersionString
     processArchitecture='x64'
-    methodology='Fresh hidden native application per scenario, 1.2 seconds settling, 1 second idle CPU sampling. Working set includes shared DLL pages; private bytes are committed private memory. 30 files are listed, with only the first loaded. No working-set trimming is performed.'
+    methodology='Fresh hidden native application per scenario, 1.2 seconds settling, 1 second idle CPU sampling. Working set includes shared DLL pages; private bytes are committed private memory; private working set counts resident pages not marked shared by QueryWorkingSet. 30 files are listed, with only the first loaded. No working-set trimming is performed.'
     results=$results
 }
 $output=Join-Path $projectRoot $OutputPath
 [IO.File]::WriteAllText($output,($report | ConvertTo-Json -Depth 8),$utf8)
-$results | Format-Table scenario,workingSetMiB,privateMiB,startupToMessageLoopMs,idleCpuMsInOneSecond -AutoSize
+$results | Format-Table scenario,workingSetMiB,privateWorkingSetMiB,privateMiB,startupToMessageLoopMs,idleCpuMsInOneSecond -AutoSize
 Write-Output "Report: $output"
