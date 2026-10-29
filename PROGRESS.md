@@ -9,7 +9,7 @@ Project: `D:\workspace\simple-md`
 - [x] Hoàn thiện giao diện mở nhiều tài liệu, đọc/sửa/song song, tìm kiếm.
 - [x] Hoàn thiện lưu an toàn, kiểm tra xung đột khi file thay đổi bên ngoài.
 - [x] Biên dịch bản chạy: 488.448 bytes (477 KiB).
-- [x] Kiểm tra 80 điều kiện về Unicode, encoding, lưu/đọc, undo, quyền MCP, revision, cache và named pipe.
+- [x] Kiểm tra 82 điều kiện về Unicode, encoding, lưu/đọc, undo, quyền MCP, revision, cache và named pipe.
 - [x] Kiểm tra MCP stdio: handshake, notifications, tool discovery, ping, lỗi, mặc định tắt.
 - [x] Kiểm tra giao diện trống qua Computer Use; đã dừng theo trao đổi với người dùng.
 - [x] Viết hướng dẫn build/chạy/kết nối MCP trong README.
@@ -58,6 +58,14 @@ Commit và push lên `main` sau mỗi phần đã hoàn thành và kiểm tra đ
 - Working set cửa sổ trống giảm từ 15,07 xuống 10,48 MiB; private committed còn 1,74 MiB.
 - Bản chạy 492.032 bytes. Kết quả đầy đủ: `benchmarks/memory-deferred.json`.
 - Mục tiêu 5 MB tổng working set chưa đạt; đang phân tích resident pages theo DLL bằng `tests/inspect-memory.ps1`.
+
+## Tối ưu cửa sổ trống — lượt 2
+
+- Bỏ phụ thuộc manifest Common Controls không cần cho các thành phần vẽ native hiện tại.
+- Khi đóng tài liệu cuối: hủy preview, giải phóng RichEdit, dừng renderer và xóa công việc render đang đợi.
+- Đã kiểm tra mở lại editor sau khi giải phóng thư viện, không mất khả năng soạn thảo.
+- Bản hiện tại: 492.032 bytes; cửa sổ trống khoảng 10,42 MiB tổng working set.
+- Mục tiêu 5 MB tổng working set vẫn chưa đạt. Bộ đo riêng từng loại RAM đang được cập nhật để tránh nhầm giữa private memory và DLL dùng chung.
 
 MCP mặc định tắt. Khi được bật, chỉ tài liệu đang mở được chia sẻ.
 MCP Edit tạo thay đổi chưa lưu để người dùng kiểm tra trước khi Ctrl+S.

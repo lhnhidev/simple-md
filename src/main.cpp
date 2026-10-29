@@ -121,6 +121,13 @@ public:
         });
     }
     void StopWorker(){ {std::lock_guard<std::mutex> lock(renderMutex);renderStop=true;}renderCondition.notify_one();if(renderer.joinable())renderer.join(); }
+    void ResetDocumentResources() {
+        KillTimer(window,1);StopWorker();
+        MSG message;while(PeekMessageW(&message,window,WM_PREVIEW_READY,WM_PREVIEW_READY,PM_REMOVE))delete (Preview*)message.lParam;
+        {std::lock_guard<std::mutex> lock(renderMutex);renderPending=false;std::string{}.swap(pendingSource);}
+        if(preview){DestroyWindow(preview);preview=nullptr;}
+        if(richModule){FreeLibrary(richModule);richModule=nullptr;}
+    }
     void Error(const std::exception& e){MessageBoxW(window,Wide(e.what()).c_str(),L"simple-md",MB_OK|MB_ICONWARNING);}
     void RefreshList() {
         SendMessageW(list,WM_SETREDRAW,FALSE,0);SendMessageW(list,LB_RESETCONTENT,0,0);
@@ -213,7 +220,7 @@ public:
         d.path=path;d.title=FileName(path);d.fingerprint=Fingerprint(bytes);d.dirty=false;SendMessageW(d.editor,EM_SETMODIFY,FALSE,0);notice=L"Saved";RefreshList();return true;
     }
     bool Confirm(Document& d) {if(!d.dirty)return true;auto result=MessageBoxW(window,(L"Save changes to "+d.title+L"?").c_str(),L"Unsaved changes",MB_YESNOCANCEL|MB_ICONQUESTION);return result==IDNO||(result==IDYES&&Save(d));}
-    void CloseDocument() {auto* d=Current();if(!d||!Confirm(*d))return;if(d->editor)DestroyWindow(d->editor);documents.erase(documents.begin()+selected);selected=-1;++generation;SetRichText(preview,L"");if(!documents.empty())Select(0);else{RefreshList();Layout();}}
+    void CloseDocument() {auto* d=Current();if(!d||!Confirm(*d))return;if(d->editor)DestroyWindow(d->editor);documents.erase(documents.begin()+selected);selected=-1;++generation;SetRichText(preview,L"");if(!documents.empty())Select(0);else{ResetDocumentResources();RefreshList();Layout();}}
     void ExternalChange() {
         if(externalChecking||closing)return;auto* d=Current();if(!d||!d->loaded||d->path.empty())return;
         externalChecking=true;

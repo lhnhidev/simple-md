@@ -23,7 +23,6 @@ Json PipeCall(Application& app,const Json& request){
 }
 int main(){
     CoInitializeEx(nullptr,COINIT_APARTMENTTHREADED);
-    HMODULE rich=LoadLibraryW(L"Msftedit.dll");
     wchar_t temp[MAX_PATH]{};GetTempPathW(MAX_PATH,temp);std::wstring folder=std::wstring(temp)+L"simple-md-tests-"+std::to_wstring(GetCurrentProcessId());CreateDirectoryW(folder.c_str(),nullptr);
     std::vector<std::wstring> files;
     try{
@@ -103,9 +102,13 @@ int main(){
         Check(reloaded["isError"].get<bool>(),"Disabled MCP became accessible during cache activity");
         app.mcp=1;reloaded=app.Mcp({{"name","read_document"},{"arguments",{{"id",std::to_string(evicted->id)}}}});
         Check(!reloaded["isError"].get<bool>()&&Payload(reloaded)["revision"].get<uint64_t>()>oldRevision,"Evicted file reload did not update its revision");
-        app.mcp=0;Check(app.Close(),"Application failed to close");DestroyWindow(window);
+        app.mcp=0;
+        while(!app.documents.empty()){app.Select(0);app.CloseDocument();}
+        Check(!app.richModule&&!app.preview&&!app.renderer.joinable(),"Closing the last document retained editor resources");
+        app.New();Check(app.Current()&&app.Current()->loaded,"Editor failed to reopen after unloading RichEdit");
+        Check(app.Close(),"Application failed to close");DestroyWindow(window);
         for(auto& file:files)DeleteFileW(file.c_str());RemoveDirectoryW(folder.c_str());
         std::cout<<"PASS: "<<checks<<" checks; large file "<<big.size()<<" bytes opened in "<<elapsed<<" ms.\n";
-        FreeLibrary(rich);CoUninitialize();return 0;
+        CoUninitialize();return 0;
     }catch(const std::exception& e){std::cerr<<"FAIL: "<<e.what()<<"\n";return 1;}
 }
