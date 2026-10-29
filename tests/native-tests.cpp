@@ -41,7 +41,7 @@ int main(){
         Application app;
         HWND window=CreateWindowExW(0,wc.lpszClassName,L"simple-md tests",WS_OVERLAPPEDWINDOW,0,0,1000,700,nullptr,nullptr,wc.hInstance,&app);
         Check(window!=nullptr,"Test window creation failed");
-        Check(app.richModule==nullptr&&app.preview==nullptr&&app.findInput==nullptr&&!app.renderer.joinable(),"Empty window eagerly initialized document components");
+        Check(app.list==nullptr&&app.richModule==nullptr&&app.preview==nullptr&&app.findInput==nullptr&&!app.renderer.joinable(),"Empty window eagerly initialized document components");
         app.Open(files[0]);Check(app.Current()!=nullptr,"Document did not open");Check(ControlText(app.Current()->editor)==source+L"updated\n","Editor changed source text");
         auto* d=app.Current();auto id=std::to_string(d->id);
         Check(app.Mcp({{"name","list_documents"}})["isError"].get<bool>(),"MCP default should be off");
@@ -112,7 +112,7 @@ int main(){
         Check(!reloaded["isError"].get<bool>()&&Payload(reloaded)["revision"].get<uint64_t>()>oldRevision,"Evicted file reload did not update its revision");
         app.mcp=0;
         while(!app.documents.empty()){app.Select(0);app.CloseDocument();}
-        Check(!app.richModule&&!app.preview&&!app.renderer.joinable(),"Closing the last document retained editor resources");
+        Check(!app.list&&!app.richModule&&!app.preview&&!app.renderer.joinable(),"Closing the last document retained editor resources");
         app.New();Check(app.Current()&&app.Current()->loaded,"Editor failed to reopen after unloading RichEdit");
         Check(app.Close(),"Application failed to close");DestroyWindow(window);
         for(auto& file:files)DeleteFileW(file.c_str());RemoveDirectoryW(folder.c_str());

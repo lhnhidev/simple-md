@@ -87,9 +87,13 @@ public:
         dpi=(int)GetDpiForWindow(window);Fonts();
         Button(L"New",ID_NEW);Button(L"Open",ID_OPEN);Button(L"Folder",ID_FOLDER);Button(L"Save",ID_SAVE);
         Button(L"Read",ID_READ);Button(L"Edit",ID_EDIT);Button(L"Split",ID_SPLIT);Button(L"MCP: Off",ID_MCP);Button(L"More",ID_MORE);
-        list=CreateWindowExW(0,L"LISTBOX",L"Open documents",WS_CHILD|WS_VISIBLE|WS_TABSTOP|WS_VSCROLL|LBS_NOTIFY|LBS_OWNERDRAWFIXED|LBS_NOINTEGRALHEIGHT|LBS_HASSTRINGS,0,0,0,0,window,(HMENU)ID_FILES,nullptr,nullptr);
-        SendMessageW(list,WM_SETFONT,(WPARAM)ui,FALSE);SendMessageW(list,LB_SETITEMHEIGHT,0,P(44));
         Layout();
+    }
+    void EnsureList() {
+        if(list)return;
+        list=CreateWindowExW(0,L"LISTBOX",L"Open documents",WS_CHILD|WS_VISIBLE|WS_TABSTOP|WS_VSCROLL|LBS_NOTIFY|LBS_OWNERDRAWFIXED|LBS_NOINTEGRALHEIGHT|LBS_HASSTRINGS,0,0,0,0,window,(HMENU)ID_FILES,nullptr,nullptr);
+        if(!list)throw std::runtime_error("Cannot create the document list.");
+        SendMessageW(list,WM_SETFONT,(WPARAM)ui,FALSE);SendMessageW(list,LB_SETITEMHEIGHT,0,P(44));
     }
     void EnsureCom() {if(!comInitialized){if(FAILED(CoInitializeEx(nullptr,COINIT_APARTMENTTHREADED)))throw std::runtime_error("Cannot initialize the Windows file dialog.");comInitialized=true;}}
     void EnsureRich() {if(!richModule){richModule=LoadLibraryW(L"Msftedit.dll");if(!richModule)throw std::runtime_error("Windows RichEdit is unavailable.");}}
@@ -126,10 +130,12 @@ public:
         MSG message;while(PeekMessageW(&message,window,WM_PREVIEW_READY,WM_PREVIEW_READY,PM_REMOVE))delete (Preview*)message.lParam;
         {std::lock_guard<std::mutex> lock(renderMutex);renderPending=false;std::string{}.swap(pendingSource);}
         if(preview){DestroyWindow(preview);preview=nullptr;}
+        if(list){DestroyWindow(list);list=nullptr;}
         if(richModule){FreeLibrary(richModule);richModule=nullptr;}
     }
     void Error(const std::exception& e){MessageBoxW(window,Wide(e.what()).c_str(),L"simple-md",MB_OK|MB_ICONWARNING);}
     void RefreshList() {
+        if(!documents.empty())EnsureList();
         SendMessageW(list,WM_SETREDRAW,FALSE,0);SendMessageW(list,LB_RESETCONTENT,0,0);
         for(auto& d:documents)SendMessageW(list,LB_ADDSTRING,0,(LPARAM)d->title.c_str());
         SendMessageW(list,LB_SETCURSEL,selected,0);SendMessageW(list,WM_SETREDRAW,TRUE,0);InvalidateRect(list,nullptr,TRUE);
@@ -448,7 +454,8 @@ int WINAPI wWinMain(HINSTANCE instance,HINSTANCE,LPWSTR,int show) {
         MSG message{};while(GetMessageW(&message,nullptr,0,0)>0){
             if(message.message==WM_KEYDOWN&&app.findVisible&&message.wParam==VK_ESCAPE){app.Find(false);continue;}
             if(message.message==WM_KEYDOWN&&message.hwnd==app.findInput&&message.wParam==VK_RETURN){app.FindNext();continue;}
-            if(!TranslateAcceleratorW(window,accelerators,&message)){TranslateMessage(&message);DispatchMessageW(&message);}
+            bool keyboard=message.message==WM_KEYDOWN||message.message==WM_SYSKEYDOWN;
+            if(!keyboard||!TranslateAcceleratorW(window,accelerators,&message)){TranslateMessage(&message);DispatchMessageW(&message);}
         }
         DestroyAcceleratorTable(accelerators);CloseHandle(mutex);
     }catch(const std::exception& e){MessageBoxW(nullptr,Wide(e.what()).c_str(),L"simple-md",MB_OK|MB_ICONERROR);return 1;}

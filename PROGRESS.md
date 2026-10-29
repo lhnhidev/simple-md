@@ -84,5 +84,13 @@ Commit và push lên `main` sau mỗi phần đã hoàn thành và kiểm tra đ
 - Kiểm tra chế độ Read từ chối sửa qua toàn bộ tuyến kết nối.
 - Client và editor kiểm thử dùng dữ liệu mẫu riêng; không sửa cấu hình Claude/Codex của người dùng.
 
+## Mục tiêu mới: 7 MB tổng working set
+
+- Người dùng yêu cầu tiếp tục giảm tổng working set, mục tiêu lần này là 7 MB.
+- Danh sách tài liệu được tạo khi có file và hủy khi đóng hết file; cửa sổ trống không tạo listbox.
+- Chỉ gọi xử lý accelerator cho thông điệp phím, không cho mọi thông điệp cửa sổ.
+- 84 kiểm tra vẫn đạt sau thay đổi. Working set bài đo đầu của lượt này: 10,13 MiB; chưa đạt mục tiêu 7 MB.
+- Đang đo tách phần khởi tạo cửa sổ, font, button, danh sách và vòng lặp phím trong chương trình đối chứng để xác định các DLL còn nạp sớm.
+
 MCP mặc định tắt. Khi được bật, chỉ tài liệu đang mở được chia sẻ.
 MCP Edit tạo thay đổi chưa lưu để người dùng kiểm tra trước khi Ctrl+S.
